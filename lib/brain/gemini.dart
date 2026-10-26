@@ -1,6 +1,8 @@
 import 'dart:convert';
 import 'dart:typed_data';
 
+import 'package:flutter/foundation.dart';
+
 import 'package:http/http.dart' as http;
 
 import '../settings.dart';
@@ -55,6 +57,35 @@ class Gemini {
         if (json) 'responseMimeType': 'application/json',
       },
     };
+    var (res, data) = await _post(body);
+    if (res.statusCode != 200) {
+      final msg = _errorMessage(res, data);
+      // Google retires model names over time. Switch to a current one and try once more.
+      if (_looksRetired(res.statusCode, msg)) {
+        final next = _suggestedModel(msg) ?? await _newestFlash();
+        if (next != null && next != settings.model) {
+          debugPrint('Switching AI model ${settings.model} -> $next');
+          await settings.update(model: next);
+          (res, data) = await _post(body);
+        }
+      }
+      if (res.statusCode != 200) {
+        throw GeminiException('AI error: ${_errorMessage(res, data)}');
+      }
+    }
+    final candidates = data['candidates'];
+    if (candidates is! List || candidates.isEmpty) {
+      throw GeminiException('The AI gave no answer. Try asking differently.');
+    }
+    final parts = (candidates.first['content']?['parts'] as List?) ?? const [];
+    final text = parts.map((p) => p is Map ? (p['text'] ?? '') : '').join().trim();
+    if (text.isEmpty) {
+      throw GeminiException('The AI gave an empty answer.');
+    }
+    return text;
+  }
+
+  Future<(http.Response, Map<String, dynamic>)> _post(Map<String, dynamic> body) async {
     final http.Response res;
     try {
       res = await http
@@ -67,26 +98,80 @@ class Gemini {
     } catch (e) {
       throw GeminiException('Could not reach the AI service. Check your internet.');
     }
-    final Map<String, dynamic> data;
     try {
-      data = jsonDecode(utf8.decode(res.bodyBytes)) as Map<String, dynamic>;
+      return (res, jsonDecode(utf8.decode(res.bodyBytes)) as Map<String, dynamic>);
     } catch (_) {
       throw GeminiException('The AI service sent an unreadable answer (HTTP ${res.statusCode}).');
     }
-    if (res.statusCode != 200) {
-      final msg = (data['error'] is Map ? data['error']['message'] : null) ?? 'HTTP ${res.statusCode}';
-      throw GeminiException('AI error: $msg');
+  }
+
+  static String _errorMessage(http.Response res, Map<String, dynamic> data) {
+    final err = data['error'];
+    return (err is Map ? err['message']?.toString() : null) ?? 'HTTP ${res.statusCode}';
+  }
+
+  static bool _looksRetired(int status, String msg) {
+    final m = msg.toLowerCase();
+    return status == 404 ||
+        m.contains('no longer available') ||
+        m.contains('not found for api version') ||
+        m.contains('is not supported for generatecontent') ||
+        m.contains('deprecated');
+  }
+
+  /// "…please use models/gemini-x-flash…" → "gemini-x-flash".
+  String? _suggestedModel(String msg) {
+    final names = RegExp(r'models/(gemini-[A-Za-z0-9.\-]+[A-Za-z0-9])')
+        .allMatches(msg)
+        .map((m) => m.group(1)!)
+        .where((n) => n != settings.model)
+        .toList();
+    return names.isEmpty ? null : names.first;
+  }
+
+  /// Asks Google which models this key can use and picks the newest plain "flash" one.
+  Future<String?> _newestFlash() async {
+    try {
+      final res = await http.get(
+        Uri.parse('https://generativelanguage.googleapis.com/v1beta/models?pageSize=200'),
+        headers: {'x-goog-api-key': settings.apiKey},
+      ).timeout(const Duration(seconds: 20));
+      if (res.statusCode != 200) {
+        return null;
+      }
+      final models = (jsonDecode(utf8.decode(res.bodyBytes))['models'] as List?) ?? const [];
+      final candidates = <(List<int>, String)>[];
+      for (final m in models) {
+        if (m is! Map) {
+          continue;
+        }
+        final name = (m['name'] ?? '').toString().replaceFirst('models/', '');
+        final methods = (m['supportedGenerationMethods'] as List?) ?? const [];
+        final plain = RegExp(r'^gemini-(\d+(?:\.\d+)?)-flash$').firstMatch(name);
+        if (plain == null || !methods.contains('generateContent')) {
+          continue;
+        }
+        final version = plain.group(1)!.split('.').map(int.parse).toList();
+        candidates.add((version, name));
+      }
+      if (candidates.isEmpty) {
+        return null;
+      }
+      candidates.sort((a, b) {
+        for (var i = 0; i < 2; i++) {
+          final x = i < a.$1.length ? a.$1[i] : 0;
+          final y = i < b.$1.length ? b.$1[i] : 0;
+          if (x != y) {
+            return y.compareTo(x);
+          }
+        }
+        return 0;
+      });
+      return candidates.first.$2;
+    } catch (e) {
+      debugPrint('Model list failed: $e');
+      return null;
     }
-    final candidates = data['candidates'];
-    if (candidates is! List || candidates.isEmpty) {
-      throw GeminiException('The AI gave no answer. Try asking differently.');
-    }
-    final parts = (candidates.first['content']?['parts'] as List?) ?? const [];
-    final text = parts.map((p) => p is Map ? (p['text'] ?? '') : '').join().trim();
-    if (text.isEmpty) {
-      throw GeminiException('The AI gave an empty answer.');
-    }
-    return text;
   }
 
   String _now() {

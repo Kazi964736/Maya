@@ -37,7 +37,7 @@ class Settings extends ChangeNotifier {
 
   AppLanguage language = languages.first;
   String apiKey = '';
-  String model = 'gemini-2.5-flash';
+  String model = 'gemini-3.8-flash';
   String city = 'Berhampore';
   String userName = '';
   bool listenOnOpen = true;
