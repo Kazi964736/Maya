@@ -34,7 +34,7 @@ workflows:
         script: flutter test
         ignore_failure: true
       - name: Build the APK
-        script: flutter build apk --release --split-per-abi
+        script: flutter build apk --release --split-per-abi --target-platform android-arm,android-arm64
       - name: Build the debug APK (shows errors on screen instead of closing)
         script: flutter build apk --debug
     artifacts:

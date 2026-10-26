@@ -31,9 +31,9 @@ class ChatMessage {
 }
 
 const _suggestions = {
-  'bn': ['মা কে ফোন করো', 'সকাল ৬টায় অ্যালার্ম দাও', '১০ মিনিটের টাইমার', 'আজ আবহাওয়া কেমন?', 'সুপ্রভাত'],
-  'hi': ['माँ को फोन करो', 'सुबह 6 बजे का अलार्म लगाओ', '10 मिनट का टाइमर', 'आज मौसम कैसा है?', 'सुप्रभात'],
-  'en': ['Call Maa', 'Set an alarm for 6 am', '10 minute timer', "How's the weather today?", 'Good morning'],
+  'bn': ['মা কে ফোন করো', 'সকাল ৬টায় অ্যালার্ম দাও', '১০ মিনিটের টাইমার', 'আজ আবহাওয়া কেমন?', 'সুপ্রভাত', 'হোয়াটসঅ্যাপ খোলো'],
+  'hi': ['माँ को फोन करो', 'सुबह 6 बजे का अलार्म लगाओ', '10 मिनट का टाइमर', 'आज मौसम कैसा है?', 'सुप्रभात', 'व्हाट्सएप खोलो'],
+  'en': ['Call Maa', 'Set an alarm for 6 am', '10 minute timer', "How's the weather today?", 'Good morning', 'Open WhatsApp'],
 };
 
 class HomeScreen extends StatefulWidget {
@@ -950,8 +950,9 @@ class _Welcome extends StatelessWidget {
     Icons.timer_outlined,
     Icons.cloud_outlined,
     Icons.wb_sunny_outlined,
+    Icons.chat_rounded,
   ];
-  static const _tints = [MayaColors.cyan, MayaColors.pink, MayaColors.amber, MayaColors.violet, MayaColors.amber];
+  static const _tints = [MayaColors.cyan, MayaColors.pink, MayaColors.amber, MayaColors.violet, MayaColors.amber, Color(0xFF22C55E)];
 
   @override
   Widget build(BuildContext context) {
