@@ -1,6 +1,9 @@
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+/// Android application id (must match `flutter create --org com.mayaai --project-name maya`).
+const appPackage = 'com.mayaai.maya';
+
 /// A language the assistant can listen and speak in.
 class AppLanguage {
   const AppLanguage(this.code, this.label, this.speechLocale, this.ttsLocale);

@@ -6,6 +6,11 @@ workflows:
     instance_type: mac_mini_m2
     environment:
       flutter: stable
+      # Permanent signing key: after uploading the keystore in Codemagic
+      # (Team settings > Code signing identities > Android keystores, reference name maya_keystore),
+      # remove the "#" from the two lines below. Until then builds use a temporary key.
+      # android_signing:
+      #   - maya_keystore
     triggering:
       events:
         - push

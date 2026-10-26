@@ -13,6 +13,7 @@ class ContactFinder {
   static final instance = ContactFinder._();
 
   List<Contact>? _cache;
+  DateTime? _cachedAt;
 
   /// Spoken family words -> names people commonly save them under.
   static const _aliases = {
@@ -39,12 +40,19 @@ class ContactFinder {
     }
   }
 
-  Future<FoundContact?> find(String spokenName) async {
+  /// Every contact that matches the spoken name equally well (best score only).
+  /// Returns null when contacts can't be read (no permission).
+  Future<List<FoundContact>?> findAll(String spokenName) async {
     if (!await ensurePermission()) {
       return null;
     }
     try {
-      _cache ??= await FlutterContacts.getContacts(withProperties: true);
+      // Re-read every few minutes so newly saved contacts are found.
+      final stale = _cachedAt == null || DateTime.now().difference(_cachedAt!) > const Duration(minutes: 5);
+      if (_cache == null || stale) {
+        _cache = await FlutterContacts.getContacts(withProperties: true);
+        _cachedAt = DateTime.now();
+      }
     } catch (e) {
       debugPrint('Reading contacts failed: $e');
       return null;
@@ -52,7 +60,7 @@ class ContactFinder {
     final contacts = _cache!.where((c) => c.phones.isNotEmpty).toList();
     final wanted = _clean(spokenName);
     if (wanted.isEmpty) {
-      return null;
+      return const [];
     }
 
     // Family words: match any saved name in the same group.
@@ -62,37 +70,58 @@ class ContactFinder {
     );
     final candidates = group.isNotEmpty ? group : [wanted];
 
-    Contact? best;
     var bestScore = 0;
+    final best = <FoundContact>[];
     for (final c in contacts) {
       final name = _clean(c.displayName);
       if (name.isEmpty) {
         continue;
       }
+      var score = 0;
       for (final w in candidates) {
-        int score = 0;
+        int s = 0;
         if (name == w) {
-          score = 100;
+          s = 100;
         } else if (name.split(' ').contains(w)) {
-          score = 80;
+          s = 80;
         } else if (name.startsWith(w)) {
-          score = 60;
+          s = 60;
         } else if (w.length >= 3 && name.contains(w)) {
-          score = 40;
+          s = 40;
         }
-        if (score > bestScore) {
-          bestScore = score;
-          best = c;
+        if (s > score) {
+          score = s;
         }
       }
+      if (score == 0 || score < bestScore) {
+        continue;
+      }
+      if (score > bestScore) {
+        bestScore = score;
+        best.clear();
+      }
+      final number = c.phones.first.number;
+      final digits = number.replaceAll(RegExp(r'[^0-9]'), '');
+      final duplicate = best.any((f) => f.number.replaceAll(RegExp(r'[^0-9]'), '').endsWith(
+            digits.length > 10 ? digits.substring(digits.length - 10) : digits,
+          ));
+      if (!duplicate) {
+        best.add(FoundContact(c.displayName, number));
+      }
     }
-    if (best == null) {
-      return null;
-    }
-    return FoundContact(best.displayName, best.phones.first.number);
+    return best;
   }
 
-  void clearCache() => _cache = null;
+  /// The single best match, or null.
+  Future<FoundContact?> find(String spokenName) async {
+    final all = await findAll(spokenName);
+    return all == null || all.isEmpty ? null : all.first;
+  }
+
+  void clearCache() {
+    _cache = null;
+    _cachedAt = null;
+  }
 
   /// "+91 98765-43210" / "098765 43210" -> "919876543210" for WhatsApp links.
   static String forWhatsApp(String number) {

@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
@@ -6,7 +7,9 @@ import 'package:image_picker/image_picker.dart';
 import '../brain/action.dart';
 import '../brain/gemini.dart';
 import '../brain/rule_parser.dart';
+import '../services/contacts.dart';
 import '../services/executor.dart';
+import '../services/phone_brand.dart';
 import '../services/voice.dart';
 import '../settings.dart';
 import 'reminders_screen.dart';
@@ -35,11 +38,11 @@ class HomeScreen extends StatefulWidget {
   State<HomeScreen> createState() => _HomeScreenState();
 }
 
-class _HomeScreenState extends State<HomeScreen> {
+class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver implements ActionUi {
   final settings = Settings.instance;
   final voice = Voice.instance;
   late final gemini = Gemini(settings);
-  late final executor = Executor(settings, gemini);
+  late final executor = Executor(settings, gemini, this);
   final _parser = const RuleParser();
   final _input = TextEditingController();
   final _messages = <ChatMessage>[];
@@ -50,9 +53,11 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _loadHistory();
     WidgetsBinding.instance.addPostFrameCallback((_) async {
-      if (settings.listenOnOpen) {
+      final fromTile = await _takeListenRequest();
+      if (settings.listenOnOpen || fromTile) {
         // Give speech set-up a moment on first launch.
         await Future<void>.delayed(const Duration(milliseconds: 600));
         if (mounted) {
@@ -62,8 +67,35 @@ class _HomeScreenState extends State<HomeScreen> {
     });
   }
 
+  /// True if the Quick Settings tile asked Maya to listen in the last few seconds.
+  Future<bool> _takeListenRequest() async {
+    try {
+      await settings.prefs.reload();
+      final at = settings.prefs.getInt('listen_request');
+      if (at == null) {
+        return false;
+      }
+      await settings.prefs.remove('listen_request');
+      return DateTime.now().millisecondsSinceEpoch - at < 15000;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      _takeListenRequest().then((asked) {
+        if (asked && mounted && !voice.listening.value) {
+          _listen();
+        }
+      });
+    }
+  }
+
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _input.dispose();
     super.dispose();
   }
@@ -222,6 +254,131 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
+  // ---- Questions the executor asks on screen ----
+
+  @override
+  Future<FoundContact?> chooseContact(String spoken, List<FoundContact> options) async {
+    if (!mounted) {
+      return null;
+    }
+    await voice.stopSpeaking();
+    if (!mounted) {
+      return null;
+    }
+    return showDialog<FoundContact>(
+      context: context,
+      builder: (ctx) => SimpleDialog(
+        title: Text(_t('Which $spoken?', 'কোন $spoken?', 'कौन से $spoken?')),
+        children: [
+          for (final c in options)
+            SimpleDialogOption(
+              onPressed: () => Navigator.pop(ctx, c),
+              child: ListTile(
+                contentPadding: EdgeInsets.zero,
+                leading: const Icon(Icons.person),
+                title: Text(c.name),
+                subtitle: Text(c.number),
+              ),
+            ),
+          SimpleDialogOption(
+            onPressed: () => Navigator.pop(ctx),
+            child: Text(_t('Cancel', 'বাতিল', 'रद्द करें')),
+          ),
+        ],
+      ),
+    );
+  }
+
+  @override
+  Future<bool> confirmCall(FoundContact contact) async {
+    if (!mounted) {
+      return false;
+    }
+    final go = await showDialog<bool>(
+      context: context,
+      builder: (_) => _CallCountdown(contact: contact, cancelLabel: _t('Cancel', 'বাতিল', 'रद्द करें')),
+    );
+    return go ?? false;
+  }
+
+  @override
+  Future<void> showReliabilityTip() async {
+    if (!mounted) {
+      return;
+    }
+    await showDialog<void>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(_t('Make reminders reliable', 'রিমাইন্ডার যেন ঠিক সময়ে আসে', 'रिमाइंडर समय पर आएँ')),
+        content: Text(_t(
+          'Your phone may stop Maya in the background to save battery, so alarms and reminders can be late. '
+              'In App info, allow Autostart / background activity and set Battery to "No restrictions".',
+          'ব্যাটারি বাঁচাতে আপনার ফোন মায়াকে বন্ধ করে দিতে পারে, তাতে অ্যালার্ম আর রিমাইন্ডার দেরিতে আসবে। '
+              'App info-তে Autostart / background চালু করুন আর Battery-তে "No restrictions" দিন।',
+          'बैटरी बचाने के लिए फोन माया को बंद कर सकता है, जिससे अलार्म और रिमाइंडर देर से आएँगे। '
+              'App info में Autostart / background चालू करें और Battery में "No restrictions" चुनें।',
+        )),
+        actions: [
+          TextButton(onPressed: () => openBatterySettings(), child: const Text('Battery')),
+          TextButton(onPressed: () => openMayaAppInfo(), child: const Text('App info')),
+          FilledButton(onPressed: () => Navigator.pop(ctx), child: const Text('OK')),
+        ],
+      ),
+    );
+  }
+
+  /// Picks the text for the current language.
+  String _t(String en, String bn, String hi) => switch (settings.language.code) {
+        'bn' => bn,
+        'hi' => hi,
+        _ => en,
+      };
+
+  Widget _languageBanner(LanguageProblem problem) {
+    final theme = Theme.of(context);
+    final name = problem.language.label;
+    final isVoice = problem.kind == 'voice';
+    final text = isVoice
+        ? _t(
+            'No $name voice is installed, so replies are read in English. Install it in Text-to-speech settings.',
+            '$name ভয়েস ইনস্টল নেই, তাই উত্তর ইংরেজিতে পড়ছে। Text-to-speech সেটিংসে ইনস্টল করুন।',
+            '$name आवाज़ इंस्टॉल नहीं है, इसलिए जवाब अंग्रेज़ी में पढ़े जा रहे हैं। Text-to-speech सेटिंग में इंस्टॉल करें।',
+          )
+        : _t(
+            "Your phone's speech service may not understand $name. Update the Google app or add $name in voice input settings.",
+            'আপনার ফোনের স্পিচ সার্ভিস হয়তো $name বোঝে না। Google অ্যাপ আপডেট করুন বা ভয়েস ইনপুট সেটিংসে $name যোগ করুন।',
+            'आपके फोन की स्पीच सर्विस शायद $name नहीं समझती। Google ऐप अपडेट करें या वॉइस इनपुट सेटिंग में $name जोड़ें।',
+          );
+    void dismiss() {
+      settings.prefs.setBool('dismissed_${problem.key}', true);
+      voice.languageProblem.value = null;
+    }
+
+    return Card(
+      margin: const EdgeInsets.fromLTRB(12, 4, 12, 4),
+      color: theme.colorScheme.tertiaryContainer,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(12, 8, 4, 4),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(text, style: TextStyle(color: theme.colorScheme.onTertiaryContainer)),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: [
+                TextButton(onPressed: dismiss, child: Text(_t('Dismiss', 'বন্ধ করুন', 'बंद करें'))),
+                TextButton(
+                  onPressed: () => isVoice ? openVoiceSettings() : openSpeechSettings(),
+                  child: Text(_t('Fix it', 'ঠিক করুন', 'ठीक करें')),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   Future<void> _clearChat() async {
     setState(_messages.clear);
     await _saveHistory();
@@ -281,6 +438,13 @@ class _HomeScreenState extends State<HomeScreen> {
                   }
                 },
               ),
+            ),
+            ValueListenableBuilder<LanguageProblem?>(
+              valueListenable: voice.languageProblem,
+              builder: (_, problem, __) =>
+                  problem == null || settings.prefs.getBool('dismissed_${problem.key}') == true
+                      ? const SizedBox.shrink()
+                      : _languageBanner(problem),
             ),
             Expanded(
               child: _messages.isEmpty
@@ -449,6 +613,71 @@ class _Bubble extends StatelessWidget {
           style: TextStyle(color: fromUser ? scheme.onPrimary : scheme.onSurface, fontSize: 16),
         ),
       ),
+    );
+  }
+}
+
+/// "Calling Rahul Das in 3…" with a Cancel button, so a misheard name never
+/// dials the wrong person.
+class _CallCountdown extends StatefulWidget {
+  const _CallCountdown({required this.contact, required this.cancelLabel});
+  final FoundContact contact;
+  final String cancelLabel;
+
+  @override
+  State<_CallCountdown> createState() => _CallCountdownState();
+}
+
+class _CallCountdownState extends State<_CallCountdown> {
+  int _left = 3;
+  Timer? _timer;
+
+  @override
+  void initState() {
+    super.initState();
+    _timer = Timer.periodic(const Duration(seconds: 1), (t) {
+      if (!mounted) {
+        t.cancel();
+        return;
+      }
+      if (_left <= 1) {
+        t.cancel();
+        Navigator.of(context).pop(true);
+      } else {
+        setState(() => _left--);
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return AlertDialog(
+      icon: const Icon(Icons.call, size: 36),
+      title: Text(widget.contact.name, textAlign: TextAlign.center),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(widget.contact.number, style: theme.textTheme.bodyLarge),
+          const SizedBox(height: 12),
+          Text('$_left', style: theme.textTheme.displaySmall),
+        ],
+      ),
+      actionsAlignment: MainAxisAlignment.spaceBetween,
+      actions: [
+        TextButton(onPressed: () => Navigator.of(context).pop(false), child: Text(widget.cancelLabel)),
+        FilledButton.icon(
+          onPressed: () => Navigator.of(context).pop(true),
+          icon: const Icon(Icons.call),
+          label: const Text('Call'),
+        ),
+      ],
     );
   }
 }

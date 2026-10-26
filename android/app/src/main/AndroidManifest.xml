@@ -46,6 +46,18 @@
             </intent-filter>
         </activity>
 
+        <!-- Quick Settings tile: one tap opens Maya listening -->
+        <service
+            android:name=".MayaTileService"
+            android:exported="true"
+            android:label="Maya"
+            android:icon="@mipmap/ic_launcher"
+            android:permission="android.permission.BIND_QUICK_SETTINGS_TILE">
+            <intent-filter>
+                <action android:name="android.service.quicksettings.action.QS_TILE" />
+            </intent-filter>
+        </service>
+
         <!-- flutter_local_notifications: reminders, and re-scheduling after reboot -->
         <receiver android:exported="false" android:name="com.dexterous.flutterlocalnotifications.ActionBroadcastReceiver" />
         <receiver android:exported="false" android:name="com.dexterous.flutterlocalnotifications.ScheduledNotificationReceiver" />

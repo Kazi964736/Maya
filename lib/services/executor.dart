@@ -9,6 +9,7 @@ import '../brain/gemini.dart';
 import '../settings.dart';
 import 'apps.dart';
 import 'contacts.dart';
+import 'phone_brand.dart';
 import 'reminders.dart';
 import 'weather.dart';
 
@@ -63,6 +64,22 @@ const _phrases = <String, Map<String, String>>{
     'hi': 'इसका जवाब देने के लिए AI key चाहिए। सेटिंग्स में Gemini key डालिए। कॉल, अलार्म, टाइमर, रिमाइंडर ऐसे ही चलेंगे।',
     'en': 'I need an AI key to answer that. Add a Gemini key in Settings. Calls, alarms, timers and reminders work without it.',
   },
+  'no_contacts_permission': {
+    'bn': 'কন্টাক্ট দেখার অনুমতি দিলে তবেই নাম ধরে ফোন করতে পারব।',
+    'hi': 'कॉन्टैक्ट देखने की अनुमति देंगे तभी नाम से फोन कर पाऊँगा।',
+    'en': 'Allow access to contacts so I can call people by name.',
+  },
+  'cancelled': {'bn': 'ঠিক আছে, বাতিল করলাম।', 'hi': 'ठीक है, रद्द कर दिया।', 'en': 'Okay, cancelled.'},
+  'alarm_fallback': {
+    'bn': 'ঘড়ির অ্যাপ সাড়া দিল না, তাই {x} টায় মায়া নিজে নোটিফিকেশন দিয়ে জানাবে।',
+    'hi': 'घड़ी ऐप ने जवाब नहीं दिया, इसलिए {x} बजे माया खुद नोटिफिकेशन से बताएगी।',
+    'en': "Your clock app didn't respond, so Maya will notify you at {x} instead.",
+  },
+  'timer_fallback': {
+    'bn': 'ঘড়ির অ্যাপ টাইমার নিল না, তাই {x} পরে মায়া নোটিফিকেশন দেবে।',
+    'hi': 'घड़ी ऐप ने टाइमर नहीं लिया, इसलिए {x} बाद माया नोटिफिकेशन देगी।',
+    'en': "Your clock app didn't take the timer, so Maya will notify you in {x}.",
+  },
   'failed': {
     'bn': 'দুঃখিত, এটা করতে পারলাম না।',
     'hi': 'माफ़ कीजिए, यह नहीं कर पाया।',
@@ -101,17 +118,65 @@ String _timeText(DateTime t) {
   return sameDay ? hm : '${t.day}/${t.month} $hm';
 }
 
+/// Things the executor needs to ask the person on screen.
+abstract class ActionUi {
+  /// Several contacts match: let the person pick one (null = cancelled).
+  Future<FoundContact?> chooseContact(String spoken, List<FoundContact> options);
+
+  /// Last chance to stop a call; true means go ahead.
+  Future<bool> confirmCall(FoundContact contact);
+
+  /// Once, on phones known to delay alarms and reminders: explain battery settings.
+  Future<void> showReliabilityTip();
+}
+
 /// Carries out an action and returns what to say back.
 class Executor {
-  Executor(this.settings, this.gemini);
+  Executor(this.settings, this.gemini, this.ui);
   final Settings settings;
   final Gemini gemini;
+  final ActionUi ui;
   final _weather = WeatherService();
 
   Future<void> _open(String url) async {
     final ok = await launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
     if (!ok) {
       throw Exception('Could not open $url');
+    }
+  }
+
+  /// Finds one contact for a spoken name, asking when several match.
+  /// Returns the contact, or a reply explaining why not.
+  Future<(FoundContact?, String?)> _resolveContact(String spoken, AppLanguage lang) async {
+    final all = await ContactFinder.instance.findAll(spoken);
+    if (all == null) {
+      return (null, phrase('no_contacts_permission', lang));
+    }
+    if (all.isEmpty) {
+      return (null, phrase('no_contact', lang, {'x': spoken}));
+    }
+    if (all.length == 1) {
+      return (all.first, null);
+    }
+    final chosen = await ui.chooseContact(spoken, all.take(8).toList());
+    return chosen == null ? (null, phrase('cancelled', lang)) : (chosen, null);
+  }
+
+  Future<bool> _clockAppHandles(AndroidIntent intent) async {
+    try {
+      return await intent.canResolveActivity() ?? false;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  Future<void> _maybeReliabilityTip() async {
+    if (settings.prefs.getBool('reliability_tip_shown') == true) {
+      return;
+    }
+    if (await isAggressiveBatteryBrand()) {
+      await settings.prefs.setBool('reliability_tip_shown', true);
+      await ui.showReliabilityTip();
     }
   }
 
@@ -127,9 +192,12 @@ class Executor {
           if (name == null) {
             return phrase('who', lang);
           }
-          final contact = await ContactFinder.instance.find(name);
+          final (contact, problem) = await _resolveContact(name, lang);
           if (contact == null) {
-            return phrase('no_contact', lang, {'x': name});
+            return problem ?? phrase('failed', lang);
+          }
+          if (!await ui.confirmCall(contact)) {
+            return phrase('cancelled', lang);
           }
           final status = await Permission.phone.request();
           if (status.isGranted) {
@@ -149,7 +217,7 @@ class Executor {
             return phrase('failed', lang);
           }
           final m = a.minute ?? 0;
-          await AndroidIntent(
+          final alarmIntent = AndroidIntent(
             action: 'android.intent.action.SET_ALARM',
             arguments: <String, dynamic>{
               'android.intent.extra.alarm.HOUR': h,
@@ -158,15 +226,27 @@ class Executor {
               'android.intent.extra.alarm.SKIP_UI': true,
             },
             flags: [Flag.FLAG_ACTIVITY_NEW_TASK],
-          ).launch();
-          return said('alarm', {'x': '${_two(h)}:${_two(m)}'});
+          );
+          if (await _clockAppHandles(alarmIntent)) {
+            await alarmIntent.launch();
+            return said('alarm', {'x': '${_two(h)}:${_two(m)}'});
+          }
+          // No clock app accepts alarms: ring with Maya's own notification instead.
+          final now = DateTime.now();
+          var at = DateTime(now.year, now.month, now.day, h, m);
+          if (!at.isAfter(now)) {
+            at = at.add(const Duration(days: 1));
+          }
+          await Reminders.instance.add('⏰ Alarm', at);
+          await _maybeReliabilityTip();
+          return phrase('alarm_fallback', lang, {'x': '${_two(h)}:${_two(m)}'});
 
         case ActionType.timer:
           final secs = a.seconds;
           if (secs == null || secs <= 0) {
             return phrase('failed', lang);
           }
-          await AndroidIntent(
+          final timerIntent = AndroidIntent(
             action: 'android.intent.action.SET_TIMER',
             arguments: <String, dynamic>{
               'android.intent.extra.alarm.LENGTH': secs,
@@ -174,8 +254,14 @@ class Executor {
               'android.intent.extra.alarm.SKIP_UI': true,
             },
             flags: [Flag.FLAG_ACTIVITY_NEW_TASK],
-          ).launch();
-          return said('timer', {'x': _durationText(secs, lang)});
+          );
+          if (await _clockAppHandles(timerIntent)) {
+            await timerIntent.launch();
+            return said('timer', {'x': _durationText(secs, lang)});
+          }
+          await Reminders.instance.add('⏱ Timer done', DateTime.now().add(Duration(seconds: secs)));
+          await _maybeReliabilityTip();
+          return phrase('timer_fallback', lang, {'x': _durationText(secs, lang)});
 
         case ActionType.reminder:
           final when = a.when;
@@ -184,6 +270,7 @@ class Executor {
           }
           final text = (a.message ?? '').isEmpty ? 'Reminder' : a.message!;
           await Reminders.instance.add(text, when);
+          await _maybeReliabilityTip();
           return said('reminder', {'x': _timeText(when)});
 
         case ActionType.openApp:
@@ -208,11 +295,11 @@ class Executor {
         case ActionType.whatsapp:
           String url = 'https://wa.me/';
           if (a.contact != null) {
-            final contact = await ContactFinder.instance.find(a.contact!);
-            if (contact == null) {
-              return phrase('no_contact', lang, {'x': a.contact!});
+            final (waContact, waProblem) = await _resolveContact(a.contact!, lang);
+            if (waContact == null) {
+              return waProblem ?? phrase('failed', lang);
             }
-            url += ContactFinder.forWhatsApp(contact.number);
+            url += ContactFinder.forWhatsApp(waContact.number);
           }
           if ((a.message ?? '').isNotEmpty) {
             url += '?text=${Uri.encodeComponent(a.message!)}';

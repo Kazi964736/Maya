@@ -67,5 +67,52 @@ if "proguard-rules.pro" not in text:
             count=1,
         )
 
+# Permanent release signing: use the keystore Codemagic provides (CM_KEYSTORE_* variables)
+# when one is attached to the build, otherwise keep the temporary debug key.
+if "CM_KEYSTORE_PATH" not in text:
+    if path is kts:
+        block = """
+    signingConfigs {
+        create("release") {
+            val ksPath = System.getenv("CM_KEYSTORE_PATH")
+            if (ksPath != null) {
+                storeFile = file(ksPath)
+                storePassword = System.getenv("CM_KEYSTORE_PASSWORD")
+                keyAlias = System.getenv("CM_KEY_ALIAS")
+                keyPassword = System.getenv("CM_KEY_PASSWORD")
+            }
+        }
+    }
+"""
+        chooser = ('signingConfig = if (System.getenv("CM_KEYSTORE_PATH") != null) '
+                   'signingConfigs.getByName("release") else signingConfigs.getByName("debug")')
+        debug_line = re.compile(r'signingConfig\s*=\s*signingConfigs\.getByName\("debug"\)')
+    else:
+        block = """
+    signingConfigs {
+        release {
+            if (System.getenv("CM_KEYSTORE_PATH") != null) {
+                storeFile file(System.getenv("CM_KEYSTORE_PATH"))
+                storePassword System.getenv("CM_KEYSTORE_PASSWORD")
+                keyAlias System.getenv("CM_KEY_ALIAS")
+                keyPassword System.getenv("CM_KEY_PASSWORD")
+            }
+        }
+    }
+"""
+        chooser = ('signingConfig System.getenv("CM_KEYSTORE_PATH") != null ? '
+                   'signingConfigs.release : signingConfigs.debug')
+        debug_line = re.compile(r'signingConfig\s+signingConfigs\.debug')
+    bt = re.search(r"\n(\s*)buildTypes\s*\{", text)
+    if bt:
+        text = text[: bt.start()] + "\n" + block.rstrip("\n") + text[bt.start():]
+        if debug_line.search(text):
+            text = debug_line.sub(chooser, text, count=1)
+        else:
+            r = re.search(r"release\s*\{", text[bt.start() + len(block):])
+            if r:
+                at = bt.start() + len(block) + r.end()
+                text = text[:at] + "\n            " + chooser + text[at:]
+
 path.write_text(text)
-print(f"Desugaring and keep-rules set up in {path.relative_to(app.parent.parent)}")
+print(f"Desugaring, keep-rules and signing set up in {path.relative_to(app.parent.parent)}")

@@ -3,6 +3,7 @@ import 'package:android_intent_plus/flag.dart';
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../services/phone_brand.dart';
 import '../settings.dart';
 
 class SettingsScreen extends StatefulWidget {
@@ -158,12 +159,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
               },
             ),
             const SizedBox(height: 24),
-            Text('Make Maya your phone\'s assistant', style: theme.textTheme.titleMedium),
+            Text('Start Maya quickly', style: theme.textTheme.titleMedium),
             const SizedBox(height: 4),
             Text(
-              'Open Default apps → Digital assistant app (or "Assist app") and choose Maya. Then long-press the home '
-              'button or the power button to start Maya. Not every phone brand lists third-party assistants; '
-              'if Maya is missing there, add the app to your home screen instead.',
+              '• Quick Settings tile: pull down the notification shade twice, tap the pencil (Edit), and drag the '
+              '"Maya" tile up. One tap starts Maya listening, even from inside other apps.\n'
+              '• Home screen: keep the Maya icon on your first screen or dock.\n'
+              '• Assistant button: on some phones, Default apps → Digital assistant app lists Maya; choose it to '
+              'open Maya with a long-press of home/power. Most phones only list Google there.',
               style: theme.textTheme.bodySmall,
             ),
             Align(
@@ -174,11 +177,52 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 onPressed: _openDefaultApps,
               ),
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: 24),
+            Text('Reliable alarms and reminders', style: theme.textTheme.titleMedium),
+            const SizedBox(height: 4),
             Text(
-              'Voices: if Maya speaks English instead of Bengali or Hindi, open phone Settings → Text-to-speech → '
-              'Speech Services by Google and install the language.',
+              'Phones from Xiaomi/Redmi, Vivo, Oppo, Realme, OnePlus and others may stop Maya in the background. '
+              'In App info allow Autostart / background activity, and set Battery to "No restrictions".',
               style: theme.textTheme.bodySmall,
+            ),
+            Wrap(
+              spacing: 8,
+              children: [
+                TextButton.icon(
+                  icon: const Icon(Icons.info_outline, size: 18),
+                  label: const Text('App info'),
+                  onPressed: openMayaAppInfo,
+                ),
+                TextButton.icon(
+                  icon: const Icon(Icons.battery_saver, size: 18),
+                  label: const Text('Battery settings'),
+                  onPressed: openBatterySettings,
+                ),
+              ],
+            ),
+            const SizedBox(height: 24),
+            Text('Voices and languages', style: theme.textTheme.titleMedium),
+            const SizedBox(height: 4),
+            Text(
+              'If Maya speaks English instead of Bengali or Hindi, install the voice in Text-to-speech settings '
+              '(Speech Services by Google). If it doesn\'t understand you, update the Google app and add the '
+              'language in voice input settings.',
+              style: theme.textTheme.bodySmall,
+            ),
+            Wrap(
+              spacing: 8,
+              children: [
+                TextButton.icon(
+                  icon: const Icon(Icons.record_voice_over, size: 18),
+                  label: const Text('Voices'),
+                  onPressed: openVoiceSettings,
+                ),
+                TextButton.icon(
+                  icon: const Icon(Icons.mic_none, size: 18),
+                  label: const Text('Voice input'),
+                  onPressed: openSpeechSettings,
+                ),
+              ],
             ),
           ],
         ),
