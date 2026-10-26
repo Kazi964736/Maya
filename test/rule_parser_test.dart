@@ -10,6 +10,22 @@ void main() {
   AssistantAction p(String s) => parser.parse(s, now: now);
 
   group('calls', () {
+    test('Bengali with the call word first', () {
+      final a = p('কল কাজী নাসার');
+      expect(a.type, ActionType.call);
+      expect(a.contact, 'কাজী নাসার');
+      expect(p('ফোন করো মাকে').contact, 'মা');
+    });
+    test('Hindi with the call word first', () {
+      final a = p('कॉल राहुल');
+      expect(a.type, ActionType.call);
+      expect(a.contact, 'राहुल');
+    });
+    test('open WhatsApp only opens the app', () {
+      expect(p('open WhatsApp').type, ActionType.openApp);
+      expect(p('হোয়াটসঅ্যাপ খোলো').type, ActionType.openApp);
+      expect(p('WhatsApp Rahul: I am late').type, ActionType.whatsapp);
+    });
     test('English', () {
       final a = p('Call Rahul');
       expect(a.type, ActionType.call);

@@ -98,6 +98,12 @@ class RuleParser {
       return AssistantAction(type: ActionType.weather, place: _afterAny(text, [' in ', ' at ']));
     }
 
+    // "open WhatsApp" / "হোয়াটসঅ্যাপ খোলো" just opens the app.
+    final openOnly = _openApp(text);
+    if (openOnly != null && _whatsappWords.contains(openOnly)) {
+      return AssistantAction(type: ActionType.openApp, app: openOnly);
+    }
+
     if (_hasAny(text, _whatsappWords)) {
       return AssistantAction(type: ActionType.whatsapp, contact: _whatsappContact(text), message: _whatsappMessage(text));
     }
@@ -257,6 +263,16 @@ class RuleParser {
     final hinglish = RegExp(r'^(.+?)\s+(?:ko|ke)\s+(?:call|phone)\s+(?:karo|lagao|koro)').firstMatch(text);
     if (hinglish != null) {
       return hinglish.group(1)!.trim();
+    }
+    // "কল কাজী নাসার", "ফোন করো মাকে", "कॉल राहुल": the call word comes first.
+    final leading = RegExp(
+      r'^(?:কল|ফোন|कॉल|फोन|फ़ोन)\s+(?:(?:করো|কর|লাগাও|দাও|करो|लगाओ|मिलाओ)\s+)?(.+?)$',
+    ).firstMatch(text);
+    if (leading != null) {
+      final name = leading.group(1)!.replaceAll(RegExp(r'\s*(?:কে|को)$'), '').trim();
+      if (name.isNotEmpty) {
+        return name;
+      }
     }
     return null;
   }
