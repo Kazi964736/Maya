@@ -22,6 +22,7 @@ class WakeMsg {
   static const pause = 'pause'; // the app is about to use the microphone
   static const resume = 'resume'; // the app is done with the microphone
   static const wake = 'wake'; // "Hey Maya" was heard (service -> app)
+  static const paused = 'paused'; // the service has let go of the microphone (service -> app)
 }
 
 /// Keys shared through SharedPreferences.
@@ -29,6 +30,7 @@ class WakeKeys {
   static const enabled = 'wake_enabled';
   static const sensitivity = 'wake_sensitivity'; // 0..1, higher hears more easily
   static const verified = 'wake_verified'; // the wake word was already checked by Voice Lock
+  static const status = 'wake_status'; // what the service is doing, for the settings screen
 }
 
 /// The app side: switching hands-free on and off and talking to the service.
@@ -40,7 +42,15 @@ class WakeWord {
   bool _initialised = false;
 
   bool get enabled => _settings.prefs.getBool(WakeKeys.enabled) ?? false;
-  double get sensitivity => _settings.prefs.getDouble(WakeKeys.sensitivity) ?? 0.5;
+  double get sensitivity => _settings.prefs.getDouble(WakeKeys.sensitivity) ?? 0.6;
+
+  /// What the listening service last reported ("listening", "paused", an error…).
+  Future<String> status() async {
+    if (!await isRunning) {
+      return enabled ? 'not running — open Maya to start it' : 'off';
+    }
+    return await FlutterForegroundTask.getData<String>(key: WakeKeys.status) ?? 'starting…';
+  }
 
   Future<void> setSensitivity(double v) async {
     await _settings.prefs.setDouble(WakeKeys.sensitivity, v);
@@ -51,11 +61,23 @@ class WakeWord {
 
   Future<bool> get isRunning => FlutterForegroundTask.isRunningService;
 
+  Completer<void>? _pauseAck;
+
+  void _onTaskData(Object data) {
+    if (data == WakeMsg.paused) {
+      final ack = _pauseAck;
+      if (ack != null && !ack.isCompleted) {
+        ack.complete();
+      }
+    }
+  }
+
   void _init() {
     if (_initialised) {
       return;
     }
     _initialised = true;
+    FlutterForegroundTask.addTaskDataCallback(_onTaskData);
     FlutterForegroundTask.init(
       androidNotificationOptions: AndroidNotificationOptions(
         channelId: 'maya_wake_word',
@@ -132,17 +154,38 @@ class WakeWord {
     }
   }
 
-  /// The app wants the microphone (it can't be shared).
-  void pause() {
-    if (enabled) {
-      FlutterForegroundTask.sendDataToTask(WakeMsg.pause);
+  bool _stoppedForApp = false;
+
+  /// The app wants the microphone (it can't be shared). Waits until the
+  /// service has really let go of it; if it doesn't answer, the service is
+  /// stopped and started again later by [resume].
+  Future<void> pause() async {
+    if (!enabled || !await isRunning) {
+      return;
     }
+    _init();
+    final ack = _pauseAck = Completer<void>();
+    FlutterForegroundTask.sendDataToTask(WakeMsg.pause);
+    try {
+      await ack.future.timeout(const Duration(milliseconds: 1500));
+    } catch (_) {
+      await FlutterForegroundTask.stopService();
+      _stoppedForApp = true;
+    }
+    // A short gap so Android hands the microphone over cleanly.
+    await Future<void>.delayed(const Duration(milliseconds: 250));
   }
 
   void resume() {
-    if (enabled) {
-      FlutterForegroundTask.sendDataToTask(WakeMsg.resume);
+    if (!enabled) {
+      return;
     }
+    if (_stoppedForApp) {
+      _stoppedForApp = false;
+      unawaited(start());
+      return;
+    }
+    FlutterForegroundTask.sendDataToTask(WakeMsg.resume);
   }
 }
 
@@ -211,6 +254,7 @@ class _WakeWordTask extends TaskHandler {
       await _startMic();
     } catch (e) {
       debugPrint('Wake word start failed: $e');
+      await _status('error: $e');
       FlutterForegroundTask.updateService(
         notificationTitle: 'Maya hands-free stopped',
         notificationText: 'Open Maya to turn it on again',
@@ -231,9 +275,46 @@ class _WakeWordTask extends TaskHandler {
         notificationTitle: 'Maya is listening',
         notificationText: 'Say "Hey Maya" any time',
       );
+      await _status('listening');
     } catch (e) {
       debugPrint('Wake word mic failed: $e');
+      await _status('microphone error: $e');
     }
+  }
+
+  Future<void> _status(String text) async {
+    final t = DateTime.now();
+    final hm = '${t.hour.toString().padLeft(2, '0')}:${t.minute.toString().padLeft(2, '0')}';
+    try {
+      await FlutterForegroundTask.saveData(key: WakeKeys.status, value: '$text ($hm)');
+    } catch (_) {}
+  }
+
+  /// Keeps only the part of [clip] where someone is speaking.
+  static Float32List _voiced(Float32List clip) {
+    const frame = _rate ~/ 50; // 20 ms
+    final frames = clip.length ~/ frame;
+    if (frames < 5) {
+      return clip;
+    }
+    final energy = List<double>.generate(frames, (f) {
+      var sum = 0.0;
+      for (var i = f * frame; i < (f + 1) * frame; i++) {
+        sum += clip[i] * clip[i];
+      }
+      return sum / frame;
+    });
+    final sorted = [...energy]..sort();
+    final floor = sorted[frames ~/ 5];
+    final loud = floor * 6 + 1e-6;
+    var first = energy.indexWhere((e) => e > loud);
+    var last = energy.lastIndexWhere((e) => e > loud);
+    if (first < 0 || last - first < 20) {
+      return clip; // under 0.4 s of speech: use everything
+    }
+    first = (first - 5).clamp(0, frames - 1);
+    last = (last + 5).clamp(0, frames - 1);
+    return Float32List.sublistView(clip, first * frame, (last + 1) * frame);
   }
 
   Future<void> _stopMic() async {
@@ -298,13 +379,19 @@ class _WakeWordTask extends TaskHandler {
     var verified = false;
     final voiceId = VoiceId.instance;
     if (await voiceId.active) {
+      var score = 0.0;
       try {
-        verified = clip.length > _rate ~/ 2 && await voiceId.isOwner(clip);
+        final speech = _voiced(clip);
+        score = speech.length > _rate ~/ 2 ? await voiceId.similarity(speech) : 0;
+        // A short wake phrase scores lower than the long teaching sentences: be a bit lenient.
+        verified = score >= voiceId.strictness - 0.08;
       } catch (e) {
         debugPrint('Wake voice check failed: $e');
+        verified = true; // never lock the owner out because the check broke
       }
       if (!verified) {
         // Someone else said "Hey Maya": stay quiet and keep listening.
+        await _status('heard "Hey Maya" but not your voice (${(score * 100).round()}% match)');
         _paused = false;
         await _startMic();
         return;
@@ -316,6 +403,7 @@ class _WakeWordTask extends TaskHandler {
     try {
       await HapticFeedback.mediumImpact();
     } catch (_) {}
+    await _status('heard "Hey Maya"');
     FlutterForegroundTask.sendDataToMain(WakeMsg.wake);
     if (!await FlutterForegroundTask.isAppOnForeground) {
       FlutterForegroundTask.wakeUpScreen();
@@ -342,7 +430,10 @@ class _WakeWordTask extends TaskHandler {
       _paused = true;
       _autoResume?.cancel();
       _autoResume = Timer(const Duration(seconds: 90), _resume);
-      unawaited(_stopMic());
+      _stopMic().whenComplete(() {
+        FlutterForegroundTask.sendDataToMain(WakeMsg.paused);
+        unawaited(_status('paused while Maya listens'));
+      });
     } else if (data == WakeMsg.resume) {
       // Give the app a moment to release the microphone.
       Timer(const Duration(milliseconds: 400), _resume);

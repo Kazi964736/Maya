@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_foreground_task/flutter_foreground_task.dart';
 import 'package:permission_handler/permission_handler.dart';
@@ -29,6 +31,9 @@ class _HandsFreeScreenState extends State<HandsFreeScreen> with WidgetsBindingOb
   bool _busy = false;
   String? _error;
   double? _sens;
+  String _status = '';
+  Timer? _poll;
+  bool _heardNow = false;
 
   String _t(String en, String bn, String hi) => switch (settings.language.code) {
         'bn' => bn,
@@ -40,12 +45,33 @@ class _HandsFreeScreenState extends State<HandsFreeScreen> with WidgetsBindingOb
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    FlutterForegroundTask.addTaskDataCallback(_onTask);
     _refresh();
+    // Show what the listening service is doing, live.
+    _poll = Timer.periodic(const Duration(seconds: 2), (_) async {
+      final st = await wake.status();
+      if (mounted && st != _status) {
+        setState(() => _status = st);
+      }
+    });
+  }
+
+  void _onTask(Object data) {
+    if (data == WakeMsg.wake && mounted) {
+      setState(() => _heardNow = true);
+      Timer(const Duration(seconds: 4), () {
+        if (mounted) {
+          setState(() => _heardNow = false);
+        }
+      });
+    }
   }
 
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+    FlutterForegroundTask.removeTaskDataCallback(_onTask);
+    _poll?.cancel();
     super.dispose();
   }
 
@@ -150,6 +176,34 @@ class _HandsFreeScreenState extends State<HandsFreeScreen> with WidgetsBindingOb
           if (_error != null) ...[
             const SizedBox(height: 8),
             Text(_error!, style: const TextStyle(color: MayaColors.amber)),
+          ],
+          if (on) ...[
+            const SizedBox(height: 8),
+            AnimatedContainer(
+              duration: const Duration(milliseconds: 250),
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: _heardNow ? const Color(0x3322C55E) : MayaColors.surface,
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: _heardNow ? const Color(0xFF22C55E) : MayaColors.border),
+              ),
+              child: Row(
+                children: [
+                  Icon(_heardNow ? Icons.check_circle_rounded : Icons.graphic_eq_rounded,
+                      color: _heardNow ? const Color(0xFF22C55E) : MayaColors.violet),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      _heardNow
+                          ? _t('Heard "Hey Maya"! It works.', '"Hey Maya" শুনেছি! কাজ করছে।', '"Hey Maya" सुन लिया! काम कर रहा है।')
+                          : '${_t('Test: say "Hey Maya" now', 'পরীক্ষা: এখন "Hey Maya" বলুন', 'टेस्ट: अभी "Hey Maya" बोलें')}\n'
+                              '${_t('Status', 'অবস্থা', 'स्थिति')}: ${_status.isEmpty ? '…' : _status}',
+                      style: const TextStyle(color: MayaColors.text, height: 1.4),
+                    ),
+                  ),
+                ],
+              ),
+            ),
           ],
           const SizedBox(height: 12),
           Card(

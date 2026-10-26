@@ -93,8 +93,7 @@ class _VoiceIdScreenState extends State<VoiceIdScreen> {
 
   /// Records with the microphone to ourselves ("Hey Maya" pauses meanwhile).
   Future<Float32List?> _record(Duration max) async {
-    WakeWord.instance.pause();
-    await Future<void>.delayed(const Duration(milliseconds: 300));
+    await WakeWord.instance.pause();
     try {
       return await id.recordPhrase(maxLength: max);
     } finally {
@@ -203,12 +202,12 @@ class _VoiceIdScreenState extends State<VoiceIdScreen> {
       const SizedBox(height: 6),
       Text(
         _t(
-          'Maya learns your voice and only obeys you. When you tap the mic, say "Maya" first. '
-              'Your voiceprint stays on this phone.',
-          'মায়া আপনার গলা চিনে নেবে আর শুধু আপনার কথাই শুনবে। মাইকে ট্যাপ করে আগে "মায়া" বলুন। '
-              'আপনার ভয়েসপ্রিন্ট শুধু এই ফোনেই থাকে।',
-          'माया आपकी आवाज़ पहचानेगी और सिर्फ़ आपकी बात मानेगी। माइक टैप करके पहले "माया" बोलें। '
-              'आपका वॉइसप्रिंट सिर्फ़ इसी फोन में रहता है।',
+          'Maya learns your voice, so "Hey Maya" only wakes her for you, not for others nearby. '
+              'Tapping the mic always works. Your voiceprint stays on this phone.',
+          'মায়া আপনার গলা চিনে নেবে, তাই "Hey Maya" বললে শুধু আপনার গলাতেই জাগবে। '
+              'মাইকে ট্যাপ করলে সবসময় চলবে। আপনার ভয়েসপ্রিন্ট শুধু এই ফোনেই থাকে।',
+          'माया आपकी आवाज़ पहचानेगी, इसलिए "Hey Maya" सिर्फ़ आपकी आवाज़ पर जागेगी। '
+              'माइक टैप करने पर हमेशा चलेगी। आपका वॉइसप्रिंट सिर्फ़ इसी फोन में रहता है।',
         ),
         textAlign: TextAlign.center,
         style: const TextStyle(color: MayaColors.textDim, height: 1.45),

@@ -3,7 +3,6 @@ import 'dart:convert';
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_foreground_task/flutter_foreground_task.dart';
 import 'package:image_picker/image_picker.dart';
 
@@ -139,6 +138,12 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver imp
     if (data != WakeMsg.wake || !_resumed || !mounted) {
       return; // if Maya is in the background, she handles it when she opens
     }
+    if (ModalRoute.of(context)?.isCurrent != true) {
+      // Another Maya screen is open (e.g. the Hey Maya test): just keep listening.
+      settings.prefs.remove('listen_request');
+      wake.resume();
+      return;
+    }
     _takeListenRequest().then((asked) {
       if (asked && mounted && !voice.listening.value && !_checkingVoice && !_busy) {
         _listen(fromWake: true);
@@ -187,10 +192,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver imp
       return;
     }
     // The microphone can't be shared: pause "Hey Maya" while Maya listens.
-    wake.pause();
-    if (wake.enabled) {
-      await Future<void>.delayed(const Duration(milliseconds: 300));
-    }
+    await wake.pause();
     try {
       await _listenNow(fromWake);
     } finally {
@@ -209,83 +211,13 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver imp
       }
       return;
     }
-    // "Hey Maya" already checked the voice in the background.
-    final alreadyChecked = fromWake && (settings.prefs.getBool(WakeKeys.verified) ?? false);
+    // Voice Lock guards "Hey Maya" (anyone can say it). A tap means the phone is
+    // in the owner's hand, so taps aren't voice-checked.
     await settings.prefs.remove(WakeKeys.verified);
-    if (!alreadyChecked && await voiceId.active) {
-      if (!await _checkOwner()) {
-        return;
-      }
-      // Give the microphone a moment to pass from the recorder to speech recognition.
-      await Future<void>.delayed(const Duration(milliseconds: 200));
-      if (!mounted) {
-        return;
-      }
-    }
     final words = await voice.listen(settings.language);
     if (words.isNotEmpty && mounted) {
       await _handle(words, fromVoice: true);
     }
-  }
-
-  /// Voice Lock: hear "Maya" and check it is the owner speaking.
-  Future<bool> _checkOwner() async {
-    await voice.stopSpeaking();
-    setState(() {
-      _checkingVoice = true;
-      _checkText = _t('Say “Maya”', 'বলুন “মায়া”', 'बोलें “माया”');
-    });
-    var ok = false;
-    String? problem;
-    try {
-      // Two tries: a short word in a noisy room can be misjudged once.
-      for (var attempt = 0; attempt < 2 && !ok; attempt++) {
-        if (attempt == 1 && mounted) {
-          setState(() => _checkText = _t('Say “Maya” once more', 'আর একবার “মায়া” বলুন', 'एक बार और “माया” बोलें'));
-        }
-        final clip = await voiceId.recordPhrase(maxLength: const Duration(seconds: 3));
-        if (clip == null) {
-          problem = _t("I didn't hear you. Tap and say “Maya”.", 'শুনতে পাইনি। ট্যাপ করে “মায়া” বলুন।',
-              'सुनाई नहीं दिया। टैप करके “माया” बोलें।');
-          break;
-        }
-        if (mounted) {
-          setState(() => _checkText = _t('Checking your voice…', 'গলা মিলিয়ে দেখছি…', 'आवाज़ मिला रही हूँ…'));
-        }
-        ok = await voiceId.isOwner(clip);
-      }
-    } catch (e) {
-      debugPrint('Voice check failed: $e');
-      problem = _t(
-        'Voice check is not working. You can turn off Voice Lock in Settings › My voice.',
-        'গলা মেলানো কাজ করছে না। সেটিংস › আমার গলা থেকে ভয়েস লক বন্ধ করতে পারেন।',
-        'आवाज़ जाँच काम नहीं कर रही। सेटिंग्स › मेरी आवाज़ में वॉइस लॉक बंद कर सकते हैं।',
-      );
-    }
-    if (!mounted) {
-      return false;
-    }
-    setState(() => _checkingVoice = false);
-    if (problem != null) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(problem)));
-      return false;
-    }
-    if (!ok) {
-      final reply = _t('Sorry, I only listen to my owner.', 'দুঃখিত, আমি শুধু আমার মালিকের কথা শুনি।',
-          'माफ़ कीजिए, मैं सिर्फ़ अपने मालिक की बात सुनती हूँ।');
-      final tip = _t(
-        'If this is you: Settings › My voice › Teach again, or move Strictness to the left.',
-        'আপনিই হলে: সেটিংস › আমার গলা › আবার শেখাও, বা কড়াভাব বাঁয়ে সরান।',
-        'अगर आप ही हैं: सेटिंग्स › मेरी आवाज़ › फिर से सिखाओ, या सख़्ती बाईं ओर करें।',
-      );
-      _add(ChatMessage(fromUser: false, text: '🔒 $reply\n$tip'));
-      if (settings.speakReplies) {
-        await voice.speak(reply, settings.language);
-      }
-      return false;
-    }
-    HapticFeedback.mediumImpact();
-    return true;
   }
 
   /// Clear phone commands are done instantly on the phone, without asking the AI
