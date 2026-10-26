@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
 
 import '../brain/action.dart';
@@ -12,6 +13,7 @@ import '../services/contacts.dart';
 import '../services/executor.dart';
 import '../services/phone_brand.dart';
 import '../services/voice.dart';
+import '../services/voice_id.dart';
 import '../settings.dart';
 import '../ui/orb.dart';
 import '../ui/theme.dart';
@@ -44,6 +46,9 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver implements ActionUi {
   final settings = Settings.instance;
   final voice = Voice.instance;
+  final voiceId = VoiceId.instance;
+  bool _checkingVoice = false;
+  String _checkText = '';
   late final gemini = Gemini(settings);
   late final executor = Executor(settings, gemini, this);
   final _parser = const RuleParser();
@@ -124,6 +129,10 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver imp
   }
 
   Future<void> _listen() async {
+    if (_checkingVoice) {
+      voiceId.stopRecording();
+      return;
+    }
     if (voice.listening.value) {
       await voice.stopListening();
       return;
@@ -141,10 +150,69 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver imp
       }
       return;
     }
+    if (await voiceId.active) {
+      if (!await _checkOwner()) {
+        return;
+      }
+      // Give the microphone a moment to pass from the recorder to speech recognition.
+      await Future<void>.delayed(const Duration(milliseconds: 200));
+      if (!mounted) {
+        return;
+      }
+    }
     final words = await voice.listen(settings.language);
     if (words.isNotEmpty && mounted) {
       await _handle(words);
     }
+  }
+
+  /// Voice Lock: hear "Maya" and check it is the owner speaking.
+  Future<bool> _checkOwner() async {
+    await voice.stopSpeaking();
+    setState(() {
+      _checkingVoice = true;
+      _checkText = _t('Say “Maya”', 'বলুন “মায়া”', 'बोलें “माया”');
+    });
+    var ok = false;
+    String? problem;
+    try {
+      final clip = await voiceId.recordPhrase(maxLength: const Duration(seconds: 3));
+      if (clip == null) {
+        problem = _t("I didn't hear you. Tap and say “Maya”.", 'শুনতে পাইনি। ট্যাপ করে “মায়া” বলুন।',
+            'सुनाई नहीं दिया। टैप करके “माया” बोलें।');
+      } else {
+        if (mounted) {
+          setState(() => _checkText = _t('Checking your voice…', 'গলা মিলিয়ে দেখছি…', 'आवाज़ मिला रही हूँ…'));
+        }
+        ok = await voiceId.isOwner(clip);
+      }
+    } catch (e) {
+      debugPrint('Voice check failed: $e');
+      problem = _t(
+        'Voice check is not working. You can turn off Voice Lock in Settings › My voice.',
+        'গলা মেলানো কাজ করছে না। সেটিংস › আমার গলা থেকে ভয়েস লক বন্ধ করতে পারেন।',
+        'आवाज़ जाँच काम नहीं कर रही। सेटिंग्स › मेरी आवाज़ में वॉइस लॉक बंद कर सकते हैं।',
+      );
+    }
+    if (!mounted) {
+      return false;
+    }
+    setState(() => _checkingVoice = false);
+    if (problem != null) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(problem)));
+      return false;
+    }
+    if (!ok) {
+      final reply = _t('Sorry, I only listen to my owner.', 'দুঃখিত, আমি শুধু আমার মালিকের কথা শুনি।',
+          'माफ़ कीजिए, मैं सिर्फ़ अपने मालिक की बात सुनती हूँ।');
+      _add(ChatMessage(fromUser: false, text: '🔒 $reply'));
+      if (settings.speakReplies) {
+        await voice.speak(reply, settings.language);
+      }
+      return false;
+    }
+    HapticFeedback.mediumImpact();
+    return true;
   }
 
   Future<void> _handle(String text, {AssistantAction? forced}) async {
@@ -500,7 +568,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver imp
                       opacity: anim,
                       child: SizeTransition(sizeFactor: anim, axisAlignment: -1, child: child),
                     ),
-                    child: voice.listening.value ? _listeningPanel(lang) : _composer(),
+                    child: voice.listening.value || _checkingVoice ? _listeningPanel(lang) : _composer(),
                   ),
                 ),
               ],
@@ -605,6 +673,13 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver imp
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
+          if (_checkingVoice)
+            Text(
+              _checkText,
+              textAlign: TextAlign.center,
+              style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w600, color: MayaColors.text),
+            )
+          else
           ValueListenableBuilder<String>(
             valueListenable: voice.heard,
             builder: (_, heard, __) => AnimatedSwitcher(
@@ -625,7 +700,11 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver imp
           const SizedBox(height: 8),
           GestureDetector(
             onTap: _listen,
-            child: MayaOrb(size: 150, mood: OrbMood.listening, level: voice.soundLevel),
+            child: MayaOrb(
+              size: 150,
+              mood: OrbMood.listening,
+              level: _checkingVoice ? voiceId.level : voice.soundLevel,
+            ),
           ),
           Row(
             mainAxisAlignment: MainAxisAlignment.center,
@@ -636,7 +715,19 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver imp
                   color: MayaColors.violet.withValues(alpha: 0.18),
                   borderRadius: BorderRadius.circular(20),
                 ),
-                child: Text(lang.label, style: const TextStyle(color: MayaColors.text, fontSize: 13)),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    if (_checkingVoice) ...[
+                      const Icon(Icons.lock_rounded, size: 13, color: MayaColors.text),
+                      const SizedBox(width: 4),
+                    ],
+                    Text(
+                      _checkingVoice ? _t('Voice Lock', 'ভয়েস লক', 'वॉइस लॉक') : lang.label,
+                      style: const TextStyle(color: MayaColors.text, fontSize: 13),
+                    ),
+                  ],
+                ),
               ),
               const SizedBox(width: 12),
               Text(

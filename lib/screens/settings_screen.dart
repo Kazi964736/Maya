@@ -4,7 +4,10 @@ import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../services/phone_brand.dart';
+import '../services/voice_id.dart';
 import '../settings.dart';
+import '../ui/theme.dart';
+import 'voice_id_screen.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -65,6 +68,25 @@ class _SettingsScreenState extends State<SettingsScreen> {
         body: ListView(
           padding: const EdgeInsets.all(16),
           children: [
+            Card(
+              child: ListTile(
+                leading: const Icon(Icons.lock_person_rounded, color: MayaColors.violet),
+                title: const Text('My voice (Voice Lock)', style: TextStyle(fontWeight: FontWeight.w600)),
+                subtitle: Text(
+                  VoiceId.instance.enrolled
+                      ? (VoiceId.instance.lockOn ? 'On — Maya only obeys your voice' : 'Off')
+                      : 'Teach Maya your voice so she only obeys you',
+                ),
+                trailing: const Icon(Icons.chevron_right_rounded),
+                onTap: () async {
+                  await Navigator.push(context, MaterialPageRoute(builder: (_) => const VoiceIdScreen()));
+                  if (mounted) {
+                    setState(() {});
+                  }
+                },
+              ),
+            ),
+            const SizedBox(height: 20),
             Text('Language', style: theme.textTheme.titleMedium),
             const SizedBox(height: 8),
             SegmentedButton<String>(
