@@ -146,7 +146,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               controller: _model,
               decoration: const InputDecoration(
                 labelText: 'AI model',
-                helperText: 'Change only if Google retires this model name.',
+                helperText: 'Leave as "auto": Maya picks the newest free Flash-Lite model.',
               ),
             ),
             const SizedBox(height: 24),

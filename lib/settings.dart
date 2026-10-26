@@ -37,7 +37,7 @@ class Settings extends ChangeNotifier {
 
   AppLanguage language = languages.first;
   String apiKey = '';
-  String model = 'gemini-3.8-flash';
+  String model = 'auto';
   String city = 'Berhampore';
   String userName = '';
   bool listenOnOpen = true;
@@ -51,6 +51,11 @@ class Settings extends ChangeNotifier {
     language = languageByCode(_prefs.getString('language'));
     apiKey = _prefs.getString('apiKey') ?? '';
     model = _prefs.getString('model') ?? model;
+    // Older versions saved a fixed model name; let Maya choose the best free one now.
+    if (const {'gemini-2.5-flash', 'gemini-3.8-flash'}.contains(model)) {
+      model = 'auto';
+      await _prefs.setString('model', model);
+    }
     city = _prefs.getString('city') ?? city;
     userName = _prefs.getString('userName') ?? '';
     listenOnOpen = _prefs.getBool('listenOnOpen') ?? true;

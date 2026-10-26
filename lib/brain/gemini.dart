@@ -33,9 +33,27 @@ class Gemini {
   Gemini(this.settings);
   final Settings settings;
 
-  Uri get _url => Uri.parse(
-        'https://generativelanguage.googleapis.com/v1beta/models/${settings.model}:generateContent',
-      );
+  static const _resolvedKey = 'resolved_model';
+
+  bool get _auto => settings.model.trim().isEmpty || settings.model == 'auto';
+
+  /// The model actually used. With "auto", Maya picks the newest Flash-Lite
+  /// model (the most free requests per day and quick answers) and remembers it.
+  Future<String> _modelName() async {
+    if (!_auto) {
+      return settings.model;
+    }
+    final cached = settings.prefs.getString(_resolvedKey);
+    if (cached != null) {
+      return cached;
+    }
+    final picked = await _pickModel();
+    if (picked == null) {
+      throw GeminiException('Could not reach the AI service. Check your internet and your AI key.');
+    }
+    await settings.prefs.setString(_resolvedKey, picked);
+    return picked;
+  }
 
   Future<String> _generate({
     required String system,
@@ -62,10 +80,22 @@ class Gemini {
       final msg = _errorMessage(res, data);
       // Google retires model names over time. Switch to a current one and try once more.
       if (_looksRetired(res.statusCode, msg)) {
-        final next = _suggestedModel(msg) ?? await _newestFlash();
-        if (next != null && next != settings.model) {
-          debugPrint('Switching AI model ${settings.model} -> $next');
-          await settings.update(model: next);
+        final current = await _modelName();
+        String? next;
+        if (_auto) {
+          await settings.prefs.remove(_resolvedKey);
+          next = await _pickModel(avoid: current);
+          if (next != null) {
+            await settings.prefs.setString(_resolvedKey, next);
+          }
+        } else {
+          next = _suggestedModel(msg, current) ?? await _pickModel(avoid: current);
+          if (next != null) {
+            await settings.update(model: next);
+          }
+        }
+        if (next != null && next != current) {
+          debugPrint('Switching AI model $current -> $next');
           (res, data) = await _post(body);
         }
       }
@@ -88,9 +118,10 @@ class Gemini {
   Future<(http.Response, Map<String, dynamic>)> _post(Map<String, dynamic> body) async {
     final http.Response res;
     try {
+      final model = await _modelName();
       res = await http
           .post(
-            _url,
+            Uri.parse('https://generativelanguage.googleapis.com/v1beta/models/$model:generateContent'),
             headers: {'Content-Type': 'application/json', 'x-goog-api-key': settings.apiKey},
             body: jsonEncode(body),
           )
@@ -120,17 +151,18 @@ class Gemini {
   }
 
   /// "…please use models/gemini-x-flash…" → "gemini-x-flash".
-  String? _suggestedModel(String msg) {
+  String? _suggestedModel(String msg, String current) {
     final names = RegExp(r'models/(gemini-[A-Za-z0-9.\-]+[A-Za-z0-9])')
         .allMatches(msg)
         .map((m) => m.group(1)!)
-        .where((n) => n != settings.model)
+        .where((n) => n != current)
         .toList();
     return names.isEmpty ? null : names.first;
   }
 
-  /// Asks Google which models this key can use and picks the newest plain "flash" one.
-  Future<String?> _newestFlash() async {
+  /// Asks Google which models this key can use and picks the newest
+  /// Flash-Lite model, or the newest Flash model if there is no Lite one.
+  Future<String?> _pickModel({String? avoid}) async {
     try {
       final res = await http.get(
         Uri.parse('https://generativelanguage.googleapis.com/v1beta/models?pageSize=200'),
@@ -140,20 +172,25 @@ class Gemini {
         return null;
       }
       final models = (jsonDecode(utf8.decode(res.bodyBytes))['models'] as List?) ?? const [];
-      final candidates = <(List<int>, String)>[];
+      final lite = <(List<int>, String)>[];
+      final flash = <(List<int>, String)>[];
       for (final m in models) {
         if (m is! Map) {
           continue;
         }
         final name = (m['name'] ?? '').toString().replaceFirst('models/', '');
         final methods = (m['supportedGenerationMethods'] as List?) ?? const [];
-        final plain = RegExp(r'^gemini-(\d+(?:\.\d+)?)-flash$').firstMatch(name);
-        if (plain == null || !methods.contains('generateContent')) {
+        if (name == avoid || !methods.contains('generateContent')) {
           continue;
         }
-        final version = plain.group(1)!.split('.').map(int.parse).toList();
-        candidates.add((version, name));
+        final m2 = RegExp(r'^gemini-(\d+(?:\.\d+)?)-flash(-lite)?$').firstMatch(name);
+        if (m2 == null) {
+          continue;
+        }
+        final version = m2.group(1)!.split('.').map(int.parse).toList();
+        (m2.group(2) != null ? lite : flash).add((version, name));
       }
+      final candidates = lite.isNotEmpty ? lite : flash;
       if (candidates.isEmpty) {
         return null;
       }
