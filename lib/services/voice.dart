@@ -159,7 +159,26 @@ class Voice {
     final words = await done.future.timeout(const Duration(seconds: 40), onTimeout: () => heard.value);
     listening.removeListener(watch);
     listening.value = false;
+    _clearSpeechWarningIfHeard(words, lang);
     return words.trim();
+  }
+
+  /// If Bengali / Hindi letters actually came back, the phone does understand
+  /// the language, so a "may not understand" warning was wrong: remove it.
+  void _clearSpeechWarningIfHeard(String words, AppLanguage lang) {
+    final script = switch (lang.code) {
+      'bn' => RegExp(r'[\u0980-\u09FF]'),
+      'hi' => RegExp(r'[\u0900-\u097F]'),
+      _ => null,
+    };
+    final problem = languageProblem.value;
+    if (script != null &&
+        script.hasMatch(words) &&
+        problem != null &&
+        problem.kind == 'speech' &&
+        problem.language.code == lang.code) {
+      languageProblem.value = null;
+    }
   }
 
   Future<void> stopListening() async {

@@ -442,7 +442,9 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver imp
             ValueListenableBuilder<LanguageProblem?>(
               valueListenable: voice.languageProblem,
               builder: (_, problem, __) =>
-                  problem == null || settings.prefs.getBool('dismissed_${problem.key}') == true
+                  problem == null ||
+                          problem.language.code != lang.code ||
+                          settings.prefs.getBool('dismissed_${problem.key}') == true
                       ? const SizedBox.shrink()
                       : _languageBanner(problem),
             ),
