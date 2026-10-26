@@ -147,6 +147,12 @@ void main() {
       expect(packageForApp('ইউটিউব'), 'com.google.android.youtube');
       expect(packageForApp('some random thing'), isNull);
     });
+    test('names that sound alike', () {
+      expect(ContactFinder.soundsLike('noushad', 'naushad ali'), greaterThan(0));
+      expect(ContactFinder.soundsLike('nowshad', 'naushad'), greaterThan(0));
+      expect(ContactFinder.soundsLike('নওশাদ', 'naushad'), greaterThan(0));
+      expect(ContactFinder.soundsLike('rahul', 'naushad'), 0);
+    });
     test('WhatsApp numbers', () {
       expect(ContactFinder.forWhatsApp('+91 98765-43210'), '919876543210');
       expect(ContactFinder.forWhatsApp('098765 43210'), '919876543210');

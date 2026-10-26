@@ -1,3 +1,5 @@
+import 'package:flutter/services.dart';
+
 /// Popular apps in India: spoken names -> Android package.
 /// Opening any other app falls back to a Play Store search.
 const knownApps = <String, List<String>>{
@@ -44,4 +46,71 @@ String? packageForApp(String spoken) {
     }
   }
   return null;
+}
+
+/// Talks to the Android side (MainActivity.kt) to open apps reliably.
+class AppLauncher {
+  static const _channel = MethodChannel('maya/apps');
+
+  /// Opens an installed app. Returns false if it isn't installed.
+  static Future<bool> launch(String package) async {
+    try {
+      return await _channel.invokeMethod<bool>('launch', {'package': package}) ?? false;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  static List<({String label, String package})>? _installed;
+
+  static Future<List<({String label, String package})>> installed() async {
+    final cached = _installed;
+    if (cached != null) {
+      return cached;
+    }
+    try {
+      final raw = await _channel.invokeListMethod<Map<dynamic, dynamic>>('installed') ?? const [];
+      final apps = [
+        for (final m in raw)
+          (label: (m['label'] ?? '').toString(), package: (m['package'] ?? '').toString()),
+      ];
+      _installed = apps;
+      return apps;
+    } catch (_) {
+      return const [];
+    }
+  }
+
+  /// Finds an installed app whose name matches what was said
+  /// ("whatsapp" also finds "WhatsApp Business").
+  static Future<String?> findInstalled(String spoken) async {
+    final s = _plain(spoken.replaceAll(RegExp(r'\s*(app|অ্যাপ|ऐप)$'), ''));
+    if (s.isEmpty) {
+      return null;
+    }
+    final apps = await installed();
+    String? best;
+    var bestScore = 0;
+    for (final a in apps) {
+      final label = _plain(a.label);
+      if (label.isEmpty) {
+        continue;
+      }
+      var score = 0;
+      if (label == s) {
+        score = 100;
+      } else if (label.startsWith(s) || s.startsWith(label)) {
+        score = 80 - (label.length - s.length).abs();
+      } else if (label.contains(s) || (label.length >= 4 && s.contains(label))) {
+        score = 60 - (label.length - s.length).abs();
+      }
+      if (score > bestScore) {
+        bestScore = score;
+        best = a.package;
+      }
+    }
+    return bestScore >= 40 ? best : null;
+  }
+
+  static String _plain(String v) => v.toLowerCase().replaceAll(RegExp(r'[^\p{L}\p{M}\p{N}]', unicode: true), '');
 }

@@ -274,25 +274,28 @@ class Executor {
           return said('reminder', {'x': _timeText(when)});
 
         case ActionType.openApp:
-          final appName = a.app ?? '';
-          final pkg = packageForApp(appName);
-          if (pkg != null) {
-            try {
-              await AndroidIntent(
-                action: 'android.intent.action.MAIN',
-                category: 'android.intent.category.LAUNCHER',
-                package: pkg,
-                flags: [Flag.FLAG_ACTIVITY_NEW_TASK],
-              ).launch();
-              return said('opening', {'x': appName});
-            } catch (e) {
-              debugPrint('Open app failed: $e');
-            }
+          final appName = (a.app ?? '').replaceFirst(RegExp(r'^(my|the|আমার|मेरा|मेरी)\s+', caseSensitive: false), '').trim();
+          // 1) a well-known app, 2) any installed app with that name, 3) Play Store.
+          final known = packageForApp(appName);
+          if (known != null && await AppLauncher.launch(known)) {
+            return said('opening', {'x': appName});
+          }
+          final installed = await AppLauncher.findInstalled(appName);
+          if (installed != null && await AppLauncher.launch(installed)) {
+            return said('opening', {'x': appName});
           }
           await _open('market://search?q=${Uri.encodeComponent(appName)}');
           return phrase('no_app', lang, {'x': appName});
 
         case ActionType.whatsapp:
+          // Nobody to message: just open WhatsApp (or WhatsApp Business).
+          if (a.contact == null && (a.message ?? '').isEmpty) {
+            final wa = await AppLauncher.launch('com.whatsapp') ||
+                await AppLauncher.launch('com.whatsapp.w4b');
+            if (wa) {
+              return said('opening', {'x': 'WhatsApp'});
+            }
+          }
           String url = 'https://wa.me/';
           if (a.contact != null) {
             final (waContact, waProblem) = await _resolveContact(a.contact!, lang);
