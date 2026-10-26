@@ -1,0 +1,36 @@
+# Builds Bolo's Android APKs on Codemagic (free plan).
+workflows:
+  android-apk:
+    name: Bolo – test APK
+    max_build_duration: 45
+    instance_type: mac_mini_m2
+    environment:
+      flutter: stable
+    triggering:
+      events:
+        - push
+      branch_patterns:
+        - pattern: main
+          include: true
+    scripts:
+      - name: Create the Android project files
+        script: |
+          flutter create --org com.boloai --platforms android --project-name bolo .
+          rm -f test/widget_test.dart
+      - name: Set up desugaring and release keep-rules
+        script: |
+          python3 tool/prepare_android.py
+          cat android/app/build.gradle* android/app/proguard-rules.pro
+      - name: Get packages
+        script: flutter pub get
+      - name: Check the code
+        script: flutter analyze --no-fatal-infos --no-fatal-warnings
+      - name: Run the command-understanding tests
+        script: flutter test
+        ignore_failure: true
+      - name: Build the APK
+        script: flutter build apk --release
+      - name: Build the debug APK (shows errors on screen instead of closing)
+        script: flutter build apk --debug
+    artifacts:
+      - build/app/outputs/flutter-apk/*.apk

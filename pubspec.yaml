@@ -1,0 +1,31 @@
+name: bolo
+description: "Bolo - a voice assistant for Android in Bengali, Hindi and English."
+publish_to: 'none'
+version: 0.1.0+1
+
+environment:
+  # Dart 3.6 = Flutter 3.27 or newer.
+  sdk: '>=3.6.0 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+  android_intent_plus: ^5.2.0
+  flutter_contacts: ^1.1.9
+  flutter_local_notifications: ^18.0.1
+  flutter_tts: ^4.2.0
+  http: ^1.2.2
+  image_picker: ^1.1.2
+  permission_handler: ^11.3.1
+  shared_preferences: ^2.3.2
+  speech_to_text: ^7.0.0
+  timezone: ^0.9.4
+  url_launcher: ^6.3.0
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^4.0.0
+
+flutter:
+  uses-material-design: true
