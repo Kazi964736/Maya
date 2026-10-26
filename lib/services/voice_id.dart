@@ -49,7 +49,7 @@ class VoiceId {
   Future<void> setLock(bool on) => _settings.prefs.setBool(_lockKey, on);
 
   /// How similar a voice must be to count as the owner (0.30 relaxed … 0.70 strict).
-  double get strictness => _settings.prefs.getDouble(_strictKey) ?? 0.45;
+  double get strictness => _settings.prefs.getDouble(_strictKey) ?? 0.35;
   Future<void> setStrictness(double v) => _settings.prefs.setDouble(_strictKey, v);
 
   Future<void> forget() async {
@@ -244,6 +244,30 @@ class VoiceId {
     }
     final owner = _normalise(avg);
     await _settings.prefs.setString(_printKey, base64Encode(owner.buffer.asUint8List()));
+
+    // Fit the strictness to this voice: compare each recording with the average of
+    // the others. Your own voice should score at least about that well later.
+    if (prints.length >= 3) {
+      var lowest = 1.0;
+      for (var i = 0; i < prints.length; i++) {
+        final others = Float32List(avg.length);
+        for (var j = 0; j < prints.length; j++) {
+          if (j == i) {
+            continue;
+          }
+          for (var k = 0; k < others.length; k++) {
+            others[k] += prints[j][k];
+          }
+        }
+        final o = _normalise(others);
+        var dot = 0.0;
+        for (var k = 0; k < o.length; k++) {
+          dot += o[k] * prints[i][k];
+        }
+        lowest = math.min(lowest, dot);
+      }
+      await setStrictness((lowest - 0.12).clamp(0.25, 0.55).toDouble());
+    }
   }
 
   /// How much a recording sounds like the owner: about 0 (different) to 1 (same).

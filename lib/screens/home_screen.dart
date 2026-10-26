@@ -238,11 +238,17 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver imp
     var ok = false;
     String? problem;
     try {
-      final clip = await voiceId.recordPhrase(maxLength: const Duration(seconds: 3));
-      if (clip == null) {
-        problem = _t("I didn't hear you. Tap and say “Maya”.", 'শুনতে পাইনি। ট্যাপ করে “মায়া” বলুন।',
-            'सुनाई नहीं दिया। टैप करके “माया” बोलें।');
-      } else {
+      // Two tries: a short word in a noisy room can be misjudged once.
+      for (var attempt = 0; attempt < 2 && !ok; attempt++) {
+        if (attempt == 1 && mounted) {
+          setState(() => _checkText = _t('Say “Maya” once more', 'আর একবার “মায়া” বলুন', 'एक बार और “माया” बोलें'));
+        }
+        final clip = await voiceId.recordPhrase(maxLength: const Duration(seconds: 3));
+        if (clip == null) {
+          problem = _t("I didn't hear you. Tap and say “Maya”.", 'শুনতে পাইনি। ট্যাপ করে “মায়া” বলুন।',
+              'सुनाई नहीं दिया। टैप करके “माया” बोलें।');
+          break;
+        }
         if (mounted) {
           setState(() => _checkText = _t('Checking your voice…', 'গলা মিলিয়ে দেখছি…', 'आवाज़ मिला रही हूँ…'));
         }
@@ -267,7 +273,12 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver imp
     if (!ok) {
       final reply = _t('Sorry, I only listen to my owner.', 'দুঃখিত, আমি শুধু আমার মালিকের কথা শুনি।',
           'माफ़ कीजिए, मैं सिर्फ़ अपने मालिक की बात सुनती हूँ।');
-      _add(ChatMessage(fromUser: false, text: '🔒 $reply'));
+      final tip = _t(
+        'If this is you: Settings › My voice › Teach again, or move Strictness to the left.',
+        'আপনিই হলে: সেটিংস › আমার গলা › আবার শেখাও, বা কড়াভাব বাঁয়ে সরান।',
+        'अगर आप ही हैं: सेटिंग्स › मेरी आवाज़ › फिर से सिखाओ, या सख़्ती बाईं ओर करें।',
+      );
+      _add(ChatMessage(fromUser: false, text: '🔒 $reply\n$tip'));
       if (settings.speakReplies) {
         await voice.speak(reply, settings.language);
       }
