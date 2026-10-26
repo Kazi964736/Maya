@@ -1,0 +1,2 @@
+Keyword-spotting model: sherpa-onnx-kws-zipformer-gigaspeech-3.3M-2024-01-01 (int8)
+from https://github.com/k2-fsa/sherpa-onnx (Apache-2.0). See MODEL_README.md.

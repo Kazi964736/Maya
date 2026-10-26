@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 
 import '../services/voice.dart';
 import '../services/voice_id.dart';
+import '../services/wake_word.dart';
 import '../settings.dart';
 import '../ui/orb.dart';
 import '../ui/theme.dart';
@@ -90,13 +91,24 @@ class _VoiceIdScreenState extends State<VoiceIdScreen> {
     }
   }
 
+  /// Records with the microphone to ourselves ("Hey Maya" pauses meanwhile).
+  Future<Float32List?> _record(Duration max) async {
+    WakeWord.instance.pause();
+    await Future<void>.delayed(const Duration(milliseconds: 300));
+    try {
+      return await id.recordPhrase(maxLength: max);
+    } finally {
+      WakeWord.instance.resume();
+    }
+  }
+
   Future<void> _recordNext() async {
     await Voice.instance.stopSpeaking();
     setState(() {
       _recording = true;
       _error = null;
     });
-    final clip = await id.recordPhrase(maxLength: const Duration(seconds: 6));
+    final clip = await _record(const Duration(seconds: 6));
     if (!mounted) {
       return;
     }
@@ -142,7 +154,7 @@ class _VoiceIdScreenState extends State<VoiceIdScreen> {
       _recording = true;
       _testResult = null;
     });
-    final clip = await id.recordPhrase();
+    final clip = await _record(const Duration(seconds: 5));
     if (!mounted) {
       return;
     }

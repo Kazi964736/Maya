@@ -9,6 +9,12 @@
     <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     <uses-permission android:name="android.permission.VIBRATE" />
+    <!-- "Hey Maya": listen for the wake word in a foreground service -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MICROPHONE" />
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
+    <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
+    <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
     <!-- No CAMERA permission on purpose: photos are taken through the camera app,
          and declaring it would make that fail until granted. -->
 
@@ -73,6 +79,11 @@
         <meta-data
             android:name="flutterEmbedding"
             android:value="2" />
+        <!-- Warning: do not change the service name (flutter_foreground_task). -->
+        <service
+            android:name="com.pravera.flutter_foreground_task.service.ForegroundService"
+            android:foregroundServiceType="microphone"
+            android:exported="false" />
     </application>
 
     <!-- Android 11+ only lets apps see / open the things listed here -->

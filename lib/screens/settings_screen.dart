@@ -5,8 +5,10 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../services/phone_brand.dart';
 import '../services/voice_id.dart';
+import '../services/wake_word.dart';
 import '../settings.dart';
 import '../ui/theme.dart';
+import 'hands_free_screen.dart';
 import 'voice_id_screen.dart';
 
 class SettingsScreen extends StatefulWidget {
@@ -80,6 +82,22 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 trailing: const Icon(Icons.chevron_right_rounded),
                 onTap: () async {
                   await Navigator.push(context, MaterialPageRoute(builder: (_) => const VoiceIdScreen()));
+                  if (mounted) {
+                    setState(() {});
+                  }
+                },
+              ),
+            ),
+            Card(
+              child: ListTile(
+                leading: const Icon(Icons.hearing_rounded, color: MayaColors.pink),
+                title: const Text('Hey Maya (hands-free)', style: TextStyle(fontWeight: FontWeight.w600)),
+                subtitle: Text(
+                  WakeWord.instance.enabled ? 'On — say "Hey Maya" any time' : 'Talk to Maya without touching the phone',
+                ),
+                trailing: const Icon(Icons.chevron_right_rounded),
+                onTap: () async {
+                  await Navigator.push(context, MaterialPageRoute(builder: (_) => const HandsFreeScreen()));
                   if (mounted) {
                     setState(() {});
                   }

@@ -13,6 +13,7 @@ dependencies:
   android_intent_plus: ^5.2.0
   device_info_plus: ^11.1.0
   flutter_contacts: ^1.1.9
+  flutter_foreground_task: '>=9.2.2 <12.0.0'
   flutter_local_notifications: ^18.0.1
   flutter_tts: ^4.2.0
   http: ^1.2.2
@@ -33,3 +34,8 @@ dev_dependencies:
 
 flutter:
   uses-material-design: true
+  assets:
+    - assets/kws/encoder.onnx
+    - assets/kws/decoder.onnx
+    - assets/kws/joiner.onnx
+    - assets/kws/tokens.txt

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_foreground_task/flutter_foreground_task.dart';
 
 import 'screens/home_screen.dart';
 import 'ui/theme.dart';
@@ -8,6 +9,8 @@ import 'settings.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  // Lets the "Hey Maya" listening service talk to the app.
+  FlutterForegroundTask.initCommunicationPort();
   await Settings.instance.load();
   // Never let a failing service stop the app from opening.
   try {

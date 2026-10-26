@@ -4,6 +4,7 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_foreground_task/flutter_foreground_task.dart';
 import 'package:image_picker/image_picker.dart';
 
 import '../brain/action.dart';
@@ -14,6 +15,7 @@ import '../services/executor.dart';
 import '../services/phone_brand.dart';
 import '../services/voice.dart';
 import '../services/voice_id.dart';
+import '../services/wake_word.dart';
 import '../settings.dart';
 import '../ui/orb.dart';
 import '../ui/theme.dart';
@@ -47,6 +49,8 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver imp
   final settings = Settings.instance;
   final voice = Voice.instance;
   final voiceId = VoiceId.instance;
+  final wake = WakeWord.instance;
+  bool _resumed = true;
   bool _checkingVoice = false;
   String _checkText = '';
   late final gemini = Gemini(settings);
@@ -62,14 +66,19 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver imp
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    FlutterForegroundTask.addTaskDataCallback(_onWakeMessage);
     _loadHistory();
     WidgetsBinding.instance.addPostFrameCallback((_) async {
+      // Hands-free listening can only be (re)started while Maya is open.
+      unawaited(wake.start());
+      // Show over the lock screen only when Voice Lock protects it.
+      FlutterForegroundTask.setOnLockScreenVisibility(wake.enabled && voiceId.lockOn);
       final fromTile = await _takeListenRequest();
       if (settings.listenOnOpen || fromTile) {
         // Give speech set-up a moment on first launch.
         await Future<void>.delayed(const Duration(milliseconds: 600));
         if (mounted) {
-          _listen();
+          _listen(fromWake: fromTile);
         }
       }
     });
@@ -92,18 +101,33 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver imp
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
+    _resumed = state == AppLifecycleState.resumed;
     if (state == AppLifecycleState.resumed) {
+      unawaited(wake.start());
       _takeListenRequest().then((asked) {
-        if (asked && mounted && !voice.listening.value) {
-          _listen();
+        if (asked && mounted && !voice.listening.value && !_checkingVoice) {
+          _listen(fromWake: true);
         }
       });
     }
   }
 
+  /// "Hey Maya" was heard by the listening service.
+  void _onWakeMessage(Object data) {
+    if (data != WakeMsg.wake || !_resumed || !mounted) {
+      return; // if Maya is in the background, she handles it when she opens
+    }
+    _takeListenRequest().then((asked) {
+      if (asked && mounted && !voice.listening.value && !_checkingVoice && !_busy) {
+        _listen(fromWake: true);
+      }
+    });
+  }
+
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+    FlutterForegroundTask.removeTaskDataCallback(_onWakeMessage);
     _input.dispose();
     super.dispose();
   }
@@ -128,7 +152,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver imp
     _saveHistory();
   }
 
-  Future<void> _listen() async {
+  Future<void> _listen({bool fromWake = false}) async {
     if (_checkingVoice) {
       voiceId.stopRecording();
       return;
@@ -140,6 +164,19 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver imp
     if (_busy) {
       return;
     }
+    // The microphone can't be shared: pause "Hey Maya" while Maya listens.
+    wake.pause();
+    if (wake.enabled) {
+      await Future<void>.delayed(const Duration(milliseconds: 300));
+    }
+    try {
+      await _listenNow(fromWake);
+    } finally {
+      wake.resume();
+    }
+  }
+
+  Future<void> _listenNow(bool fromWake) async {
     if (!voice.canListen && !await voice.init()) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -150,7 +187,10 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver imp
       }
       return;
     }
-    if (await voiceId.active) {
+    // "Hey Maya" already checked the voice in the background.
+    final alreadyChecked = fromWake && (settings.prefs.getBool(WakeKeys.verified) ?? false);
+    await settings.prefs.remove(WakeKeys.verified);
+    if (!alreadyChecked && await voiceId.active) {
       if (!await _checkOwner()) {
         return;
       }
