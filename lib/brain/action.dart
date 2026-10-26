@@ -11,6 +11,10 @@ class AssistantAction {
     this.app,
     this.place,
     this.query,
+    this.repeat,
+    this.setting,
+    this.live = false,
+    this.steps = const [],
     this.reply = '',
   });
 
@@ -42,6 +46,19 @@ class AssistantAction {
   /// Search text.
   final String? query;
 
+  /// For reminders: null (once), "daily" or "weekly".
+  final String? repeat;
+
+  /// For phone control: torch_on, torch_off, volume_up, volume_down, volume_max,
+  /// mute, vibrate, ring, battery, wifi, bluetooth, dnd, brightness, data.
+  final String? setting;
+
+  /// For answers: true when it needs fresh information from the web.
+  final bool live;
+
+  /// For several things at once ("set an alarm and remind me…").
+  final List<AssistantAction> steps;
+
   /// What the assistant should say back, in the user's language.
   final String reply;
 
@@ -67,6 +84,21 @@ class AssistantAction {
   }
 
   factory AssistantAction.fromJson(Map<String, dynamic> json) {
+    final rawSteps = json['steps'];
+    if (rawSteps is List && rawSteps.isNotEmpty) {
+      final steps = [
+        for (final st in rawSteps)
+          if (st is Map) AssistantAction.fromJson(Map<String, dynamic>.from(st)),
+      ];
+      final reply = _str(json['reply']) ?? '';
+      if (steps.length == 1) {
+        final one = steps.first;
+        return one.reply.isEmpty && reply.isNotEmpty ? one.withReply(reply) : one;
+      }
+      if (steps.isNotEmpty) {
+        return AssistantAction(type: ActionType.multi, steps: steps, reply: reply);
+      }
+    }
     final type = _str(json['action'] ?? json['type']) ?? ActionType.answer;
     DateTime? when;
     final whenText = _str(json['when']);
@@ -87,13 +119,35 @@ class AssistantAction {
       app: _str(json['app']),
       place: _str(json['place']),
       query: _str(json['query']),
+      repeat: const {'daily', 'weekly'}.contains(_str(json['repeat'])) ? _str(json['repeat']) : null,
+      setting: _str(json['setting']),
+      live: json['live'] == true || json['live'] == 'true',
       reply: _str(json['reply']) ?? '',
     );
   }
 
+  AssistantAction withReply(String newReply) => AssistantAction(
+        type: type,
+        contact: contact,
+        message: message,
+        hour: hour,
+        minute: minute,
+        seconds: seconds,
+        when: when,
+        app: app,
+        place: place,
+        query: query,
+        repeat: repeat,
+        setting: setting,
+        live: live,
+        steps: steps,
+        reply: newReply,
+      );
+
   @override
   String toString() => 'AssistantAction($type, contact: $contact, message: $message, hour: $hour, '
-      'minute: $minute, seconds: $seconds, when: $when, app: $app, place: $place, query: $query)';
+      'minute: $minute, seconds: $seconds, when: $when, app: $app, place: $place, query: $query, '
+      'repeat: $repeat, setting: $setting, live: $live, steps: $steps)';
 }
 
 class ActionType {
@@ -108,6 +162,17 @@ class ActionType {
   static const briefing = 'briefing';
   static const search = 'search';
   static const answer = 'answer';
+  static const remember = 'remember';
+  static const forget = 'forget';
+  static const recall = 'recall';
+  static const readMessages = 'read_messages';
+  static const replyMessage = 'reply_message';
+  static const phone = 'phone';
+  static const interpreter = 'interpreter';
+  static const multi = 'multi';
 
-  static const all = {call, alarm, timer, reminder, openApp, whatsapp, navigate, weather, briefing, search, answer};
+  static const all = {
+    call, alarm, timer, reminder, openApp, whatsapp, navigate, weather, briefing, search, answer, //
+    remember, forget, recall, readMessages, replyMessage, phone, interpreter, multi,
+  };
 }

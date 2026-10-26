@@ -9,6 +9,47 @@ void main() {
   final now = DateTime(2026, 10, 26, 10, 0);
   AssistantAction p(String s) => parser.parse(s, now: now);
 
+  group('genius', () {
+    test('several commands in one sentence', () {
+      final a = p('set an alarm for 6 am and remind me to call Maa in 10 minutes');
+      expect(a.type, ActionType.multi);
+      expect(a.steps.length, 2);
+      expect(a.steps[0].type, ActionType.alarm);
+      expect(a.steps[1].type, ActionType.reminder);
+    });
+    test('"and" inside one command is not split', () {
+      expect(p('what is the difference between rice and wheat').type, ActionType.answer);
+    });
+    test('remember and forget', () {
+      final a = p('remember that my bike is parked on level B2');
+      expect(a.type, ActionType.remember);
+      expect(a.message, 'my bike is parked on level b2');
+      expect(p('মনে রেখো গাড়ির চাবি আলমারিতে').type, ActionType.remember);
+      expect(p('forget about the bike').type, ActionType.forget);
+      expect(p('remember to call Maa at 6 pm').type, isNot(ActionType.remember));
+    });
+    test('repeating reminder', () {
+      final a = p('remind me every day at 8 am to take medicine');
+      expect(a.type, ActionType.reminder);
+      expect(a.repeat, 'daily');
+      expect(a.when?.hour, 8);
+    });
+    test('phone controls', () {
+      expect(p('turn on the torch').setting, 'torch_on');
+      expect(p('টর্চ বন্ধ করো').setting, 'torch_off');
+      expect(p('volume up').setting, 'volume_up');
+      expect(p('आवाज़ कम करो').setting, 'volume_down');
+      expect(p('how much battery is left').setting, 'battery');
+    });
+    test('messages', () {
+      expect(p('read my messages').type, ActionType.readMessages);
+      expect(p('মেসেজ পড়ো').type, ActionType.readMessages);
+      final r = p('reply I am coming in 10 minutes');
+      expect(r.type, ActionType.replyMessage);
+      expect(r.message, 'i am coming in 10 minutes');
+    });
+  });
+
   group('calls', () {
     test('Bengali with the call word first', () {
       final a = p('কল কাজী নাসার');

@@ -42,7 +42,11 @@ class RuleParser {
     return buf.toString().toLowerCase().replaceAll(RegExp(r'[।?!,]'), ' ').replaceAll(RegExp(r'\s+'), ' ').trim();
   }
 
-  static bool _hasAny(String text, List<String> words) => words.any(text.contains);
+  static final _normalCache = <String, String>{};
+
+  /// True if [text] contains any of [words] (spelled either way for dotted letters).
+  static bool _hasAny(String text, List<String> words) =>
+      words.any((w) => text.contains(_normalCache.putIfAbsent(w, () => normalize(w))));
 
   static const _timerWords = ['timer', 'টাইমার', 'टाइमर'];
   static const _alarmWords = ['alarm', 'অ্যালার্ম', 'এলার্ম', 'অ্যালার্ম', 'अलार्म', 'wake me', 'উঠিয়ে', 'জাগিয়ে', 'उठा'];
@@ -61,13 +65,39 @@ class RuleParser {
     caseSensitive: false,
   );
 
+  /// Words that join several commands: "set an alarm at 6 and remind me…".
+  static final _joiners = RegExp(
+    r'\s*,?\s+(?:and then|then|and|আর তারপর|তারপর|আর|এবং|और फिर|फिर|और)\s+',
+    caseSensitive: false,
+  );
+
   AssistantAction parse(String input, {DateTime? now}) {
     final spoken = input.replaceFirst(_wakeWord, '');
-    final text = normalize(spoken);
     final clock = now ?? DateTime.now();
+    final whole = _parseOne(spoken, clock);
+
+    // Several commands in one sentence? Only if every part is a real command.
+    final parts = spoken.split(_joiners).map((p) => p.trim()).where((p) => p.isNotEmpty).toList();
+    if (parts.length >= 2 && parts.length <= 5) {
+      final steps = [for (final p in parts) _parseOne(p, clock)];
+      final allReal = steps.every((a) => a.type != ActionType.answer && a.type != ActionType.search);
+      if (allReal) {
+        return AssistantAction(type: ActionType.multi, steps: steps);
+      }
+    }
+    return whole;
+  }
+
+  AssistantAction _parseOne(String spoken, DateTime clock) {
+    final text = normalize(spoken);
 
     if (text.isEmpty) {
       return const AssistantAction(type: ActionType.answer);
+    }
+
+    final memory = _memory(text, spoken);
+    if (memory != null) {
+      return memory;
     }
 
     if (_hasAny(text, _timerWords)) {
@@ -78,9 +108,19 @@ class RuleParser {
     }
 
     if (_hasAny(text, _remindWords)) {
-      final when = _reminderTime(text, clock);
+      final repeat = _repeat(text);
+      var when = _reminderTime(text, clock);
+      if (repeat != null && when == null) {
+        final t = _clockTime(text);
+        if (t != null) {
+          when = DateTime(clock.year, clock.month, clock.day, t.$1, t.$2);
+          if (!when.isAfter(clock)) {
+            when = when.add(const Duration(days: 1));
+          }
+        }
+      }
       final what = _reminderText(spoken);
-      return AssistantAction(type: ActionType.reminder, when: when, message: what);
+      return AssistantAction(type: ActionType.reminder, when: when, message: what, repeat: repeat);
     }
 
     if (_hasAny(text, _alarmWords)) {
@@ -96,6 +136,11 @@ class RuleParser {
 
     if (_hasAny(text, _weatherWords)) {
       return AssistantAction(type: ActionType.weather, place: _afterAny(text, [' in ', ' at ']));
+    }
+
+    final device = _device(text);
+    if (device != null) {
+      return device;
     }
 
     // "open WhatsApp" / "হোয়াটসঅ্যাপ খোলো" just opens the app.
@@ -133,6 +178,116 @@ class RuleParser {
     }
 
     return const AssistantAction(type: ActionType.answer);
+  }
+
+  // ---- memory, messages and the phone ----
+
+  static AssistantAction? _memory(String text, String spoken) {
+    final save = RegExp(r'^(?:please\s+)?(?:remember|note|keep in mind)\s+(?:that\s+)?(.+)$').firstMatch(text) ??
+        RegExp(r'^(?:মনে রেখো|মনে রাখো|মনে রাখবে|याद रखना|याद रखो)\s+(?:যে|कि)?\s*(.+)$').firstMatch(text) ??
+        RegExp(r'^(.+?)\s*(?:মনে রেখো|মনে রাখো|মনে রাখবে|याद रखना|याद रखो)$').firstMatch(text);
+    if (save != null) {
+      final fact = save.group(1)!.trim();
+      // "remember to call Maa at 6" is a reminder, not a memory.
+      if (fact.startsWith('to ') || RegExp(r'\d').hasMatch(fact) && _hasAny(fact, _amWords + _pmWords + ['at '])) {
+        return null;
+      }
+      return AssistantAction(type: ActionType.remember, message: fact);
+    }
+    final forget = RegExp(r'^(?:please\s+)?forget\s+(?:about\s+|that\s+)?(.+)$').firstMatch(text) ??
+        RegExp(r'^(.+?)\s*(?:ভুলে যাও|ভুলে যা|भूल जाओ|भूल जा)$').firstMatch(text);
+    if (forget != null) {
+      return AssistantAction(type: ActionType.forget, query: forget.group(1)!.trim());
+    }
+    if (RegExp(r'what do you remember|what have you remembered|কী মনে রেখেছ|কি মনে রেখেছ|क्या याद है|क्या याद रखा')
+        .hasMatch(text)) {
+      return const AssistantAction(type: ActionType.recall);
+    }
+    return null;
+  }
+
+  static AssistantAction? _device(String text) {
+    // Messages
+    final readFrom = RegExp(r'(?:read|any) (?:my )?(?:new )?messages? from (.+)$').firstMatch(text) ??
+        RegExp(r'^(.+?)(?:র|এর|-এর)? মেসেজ পড়ো$').firstMatch(text) ??
+        RegExp(r'^(.+?) (?:का|के) मैसेज पढ़ो$').firstMatch(text);
+    final fromWho = readFrom?.group(1)?.trim();
+    if (fromWho != null && !const {'new', 'my', 'the', 'নতুন', 'আমার', 'সব', 'नए', 'मेरे', 'सब'}.contains(fromWho)) {
+      return AssistantAction(type: ActionType.readMessages, contact: fromWho);
+    }
+    if (RegExp(r'read (?:my |the )?(?:new |latest )?(?:whatsapp )?messages|who messaged|any new messages|'
+            r'মেসেজ পড়|মেসেজ শোনাও|কে মেসেজ|मैसेज पढ़|मैसेज सुनाओ|किसका मैसेज')
+        .hasMatch(text)) {
+      return const AssistantAction(type: ActionType.readMessages);
+    }
+    final reply = RegExp(r'^(?:reply)(?: to (\S+))?\s*(?:saying|that|:)?\s+(.+)$').firstMatch(text) ??
+        RegExp(r'^(?:রিপ্লাই|উত্তর দাও|জবাব দাও|रिप्लाई|जवाब दो)\s*(?:করো|कर)?\s+(?:যে|कि)?\s*(.+)$').firstMatch(text);
+    if (reply != null) {
+      final hasTo = reply.groupCount >= 2;
+      return AssistantAction(
+        type: ActionType.replyMessage,
+        contact: hasTo ? reply.group(1) : null,
+        message: (hasTo ? reply.group(2) : reply.group(1))!.trim(),
+      );
+    }
+
+    // Torch
+    final torch = _hasAny(text, ['torch', 'flashlight', 'flash light', 'টর্চ', 'টর্চলাইট', 'टॉर्च', 'फ्लैशलाइट']);
+    if (torch) {
+      final off = _hasAny(text, ['off', 'বন্ধ', 'নেভাও', 'নিভিয়ে', 'बंद', 'बुझा']);
+      return AssistantAction(type: ActionType.phone, setting: off ? 'torch_off' : 'torch_on');
+    }
+    // Volume
+    if (_hasAny(text, ['volume', 'ভলিউম', 'আওয়াজ', 'आवाज़', 'आवाज', 'वॉल्यूम'])) {
+      if (_hasAny(text, ['mute', 'মিউট', 'म्यूट'])) {
+        return const AssistantAction(type: ActionType.phone, setting: 'mute');
+      }
+      if (_hasAny(text, ['full', 'max', 'পুরো', 'फुल', 'पूरी'])) {
+        return const AssistantAction(type: ActionType.phone, setting: 'volume_max');
+      }
+      final down = _hasAny(text, ['down', 'lower', 'decrease', 'reduce', 'কমাও', 'কম', 'कम']);
+      return AssistantAction(type: ActionType.phone, setting: down ? 'volume_down' : 'volume_up');
+    }
+    if (_hasAny(text, ['vibrate', 'vibration', 'ভাইব্রেট', 'वाइब्रेट'])) {
+      return const AssistantAction(type: ActionType.phone, setting: 'vibrate');
+    }
+    if (_hasAny(text, ['ring mode', 'normal mode', 'sound mode', 'রিং মোড', 'रिंग मोड'])) {
+      return const AssistantAction(type: ActionType.phone, setting: 'ring');
+    }
+    if (_hasAny(text, ['battery', 'charge left', 'ব্যাটারি', 'চার্জ কত', 'बैटरी', 'चार्ज कितना'])) {
+      return const AssistantAction(type: ActionType.phone, setting: 'battery');
+    }
+    if (_hasAny(text, ['wifi', 'wi-fi', 'wi fi', 'ওয়াইফাই', 'ওয়াই-ফাই', 'वाईफाई', 'वाई-फाई'])) {
+      return const AssistantAction(type: ActionType.phone, setting: 'wifi');
+    }
+    if (_hasAny(text, ['bluetooth', 'ব্লুটুথ', 'ब्लूटूथ'])) {
+      return const AssistantAction(type: ActionType.phone, setting: 'bluetooth');
+    }
+    if (_hasAny(text, ['do not disturb', 'dnd', 'ডু নট ডিস্টার্ব', 'डू नॉट डिस्टर्ब'])) {
+      return const AssistantAction(type: ActionType.phone, setting: 'dnd');
+    }
+    if (_hasAny(text, ['brightness', 'উজ্জ্বলতা', 'ব্রাইটনেস', 'ब्राइटनेस'])) {
+      return const AssistantAction(type: ActionType.phone, setting: 'brightness');
+    }
+    if (_hasAny(text, ['mobile data', 'internet on', 'মোবাইল ডেটা', 'মোবাইল ডাটা', 'मोबाइल डेटा'])) {
+      return const AssistantAction(type: ActionType.phone, setting: 'data');
+    }
+    if (_hasAny(text, ['interpreter', 'translate conversation', 'translator', 'দোভাষী', 'दुभाषिया', 'ট্রান্সলেটর'])) {
+      return const AssistantAction(type: ActionType.interpreter);
+    }
+    return null;
+  }
+
+  static String? _repeat(String text) {
+    if (_hasAny(text, ['every day', 'everyday', 'daily', 'each day', 'প্রতিদিন', 'রোজ', 'हर दिन', 'रोज़', 'रोज', 'रोजाना'])) {
+      return 'daily';
+    }
+    if (_hasAny(text, ['every week', 'weekly', 'every monday', 'every tuesday', 'every wednesday', 'every thursday',
+      'every friday', 'every saturday', 'every sunday', 'প্রতি সপ্তাহে', 'প্রতি সোমবার', 'প্রতি রবিবার', 'हर हफ्ते', 'हर हफ़्ते',
+      'हर सोमवार', 'हर रविवार'])) {
+      return 'weekly';
+    }
+    return null;
   }
 
   // ---- durations and times ----

@@ -59,7 +59,10 @@ class RemindersScreen extends StatelessWidget {
                     child: const Icon(Icons.alarm_rounded, color: MayaColors.violet, size: 21),
                   ),
                   title: Text(r.text, style: const TextStyle(color: MayaColors.text, fontWeight: FontWeight.w500)),
-                  subtitle: Text(_when(r.when), style: const TextStyle(color: MayaColors.textDim)),
+                  subtitle: Text(
+                    '${_when(r.next)}${r.repeat == 'daily' ? '  ·  every day' : r.repeat == 'weekly' ? '  ·  every week' : ''}',
+                    style: const TextStyle(color: MayaColors.textDim),
+                  ),
                   trailing: IconButton(
                     tooltip: 'Delete',
                     icon: const Icon(Icons.delete_outline_rounded),

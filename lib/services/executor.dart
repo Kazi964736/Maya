@@ -9,6 +9,8 @@ import '../brain/gemini.dart';
 import '../settings.dart';
 import 'apps.dart';
 import 'contacts.dart';
+import 'device.dart';
+import 'memory.dart';
 import 'phone_brand.dart';
 import 'reminders.dart';
 import 'weather.dart';
@@ -80,6 +82,64 @@ const _phrases = <String, Map<String, String>>{
     'hi': 'घड़ी ऐप ने टाइमर नहीं लिया, इसलिए {x} बाद माया नोटिफिकेशन देगी।',
     'en': "Your clock app didn't take the timer, so Maya will notify you in {x}.",
   },
+  'reminder_repeat': {
+    'bn': 'ঠিক আছে, {rep} {x} টায় মনে করিয়ে দেব।',
+    'hi': 'ठीक है, {rep} {x} बजे याद दिला दूँगा।',
+    'en': "Okay, I'll remind you {rep} at {x}.",
+  },
+  'remembered': {'bn': 'মনে রাখলাম।', 'hi': 'याद रख लिया।', 'en': "Got it, I'll remember that."},
+  'forgot': {'bn': 'ভুলে গেলাম।', 'hi': 'भूल गया।', 'en': 'Done, I forgot that.'},
+  'forget_none': {
+    'bn': 'এমন কিছু মনে রাখা ছিল না।',
+    'hi': 'ऐसा कुछ याद नहीं रखा था।',
+    'en': "I didn't have anything like that saved.",
+  },
+  'recall_none': {
+    'bn': 'এখনও কিছু মনে রাখতে বলেননি। বলুন "মনে রেখো…"।',
+    'hi': 'अभी तक कुछ याद रखने को नहीं कहा। बोलिए "याद रखना…"।',
+    'en': 'You haven\'t asked me to remember anything yet. Say "remember that…".',
+  },
+  'recall_some': {'bn': 'আমি মনে রেখেছি: {x}', 'hi': 'मुझे याद है: {x}', 'en': 'Here is what I remember: {x}'},
+  'memory_answer': {'bn': 'আপনি বলেছিলেন: {x}', 'hi': 'आपने बताया था: {x}', 'en': 'You told me: {x}'},
+  'msg_access': {
+    'bn': 'মেসেজ পড়তে "নোটিফিকেশন অ্যাক্সেস" দিন। সেটিংস খুলছি, মায়া চালু করুন।',
+    'hi': 'मैसेज पढ़ने के लिए "नोटिफ़िकेशन एक्सेस" दीजिए। सेटिंग्स खोल रहा हूँ, माया चालू कीजिए।',
+    'en': 'To read messages, allow "Notification access" for Maya. Opening that setting now.',
+  },
+  'msg_none': {
+    'bn': 'নতুন কোনো মেসেজ নেই।',
+    'hi': 'कोई नया मैसेज नहीं है।',
+    'en': 'No new messages.',
+  },
+  'msg_none_from': {'bn': '{x}-এর কোনো নতুন মেসেজ নেই।', 'hi': '{x} का कोई नया मैसेज नहीं।', 'en': 'No new messages from {x}.'},
+  'msg_reply_hint': {
+    'bn': 'উত্তর দিতে বলুন "রিপ্লাই" আর আপনার কথা।',
+    'hi': 'जवाब देने के लिए बोलिए "रिप्लाई" और अपनी बात।',
+    'en': 'Say "reply" and your message to answer.',
+  },
+  'msg_who': {
+    'bn': 'কাকে উত্তর দেব? আগে বলুন "মেসেজ পড়ো"।',
+    'hi': 'किसे जवाब दूँ? पहले बोलिए "मैसेज पढ़ो"।',
+    'en': 'Who should I reply to? Say "read my messages" first.',
+  },
+  'msg_what': {'bn': 'কী লিখব?', 'hi': 'क्या लिखूँ?', 'en': 'What should I say?'},
+  'msg_sent': {'bn': '{x}-কে পাঠিয়ে দিলাম।', 'hi': '{x} को भेज दिया।', 'en': 'Sent to {x}.'},
+  'msg_cant_reply': {
+    'bn': 'এই মেসেজে সরাসরি উত্তর দেওয়া যাচ্ছে না।',
+    'hi': 'इस मैसेज का सीधा जवाब नहीं दिया जा सकता।',
+    'en': "I can't reply to that message directly.",
+  },
+  'torch_on': {'bn': 'টর্চ জ্বালালাম।', 'hi': 'टॉर्च जला दी।', 'en': 'Torch on.'},
+  'torch_off': {'bn': 'টর্চ নিভিয়ে দিলাম।', 'hi': 'टॉर्च बंद कर दी।', 'en': 'Torch off.'},
+  'volume': {'bn': 'ভলিউম ঠিক করলাম।', 'hi': 'आवाज़ बदल दी।', 'en': 'Volume changed.'},
+  'ringer': {'bn': 'ফোন {x} মোডে।', 'hi': 'फोन {x} मोड में।', 'en': 'Phone on {x}.'},
+  'battery': {
+    'bn': 'ব্যাটারি {x}%{c}।',
+    'hi': 'बैटरी {x}%{c}।',
+    'en': 'Battery is at {x}%{c}.',
+  },
+  'settings_open': {'bn': '{x} সেটিং খুলছি।', 'hi': '{x} सेटिंग खोल रहा हूँ।', 'en': 'Opening {x} settings.'},
+  'interpreter': {'bn': 'দোভাষী মোড খুলছি।', 'hi': 'दुभाषिया मोड खोल रहा हूँ।', 'en': 'Opening interpreter mode.'},
   'failed': {
     'bn': 'দুঃখিত, এটা করতে পারলাম না।',
     'hi': 'माफ़ कीजिए, यह नहीं कर पाया।',
@@ -120,6 +180,12 @@ String _timeText(DateTime t) {
 
 /// Things the executor needs to ask the person on screen.
 abstract class ActionUi {
+  /// Ask before sending a message by voice (true = send).
+  Future<bool> confirmSend(String to, String text);
+
+  /// Open the two-person interpreter screen.
+  Future<void> openInterpreter();
+
   /// Several contacts match: let the person pick one (null = cancelled).
   Future<FoundContact?> chooseContact(String spoken, List<FoundContact> options);
 
@@ -180,7 +246,8 @@ class Executor {
     }
   }
 
-  Future<String> run(AssistantAction a) async {
+  /// Carries out [a]. [heard] is what the user said (used for live answers and memory).
+  Future<String> run(AssistantAction a, {String heard = '', List<ChatTurn> history = const []}) async {
     final lang = settings.language;
     String said(String fallbackKey, [Map<String, String> fill = const {}]) =>
         a.reply.isNotEmpty ? a.reply : phrase(fallbackKey, lang, fill);
@@ -269,8 +336,15 @@ class Executor {
             return phrase('reminder_when', lang);
           }
           final text = (a.message ?? '').isEmpty ? 'Reminder' : a.message!;
-          await Reminders.instance.add(text, when);
+          await Reminders.instance.add(text, when, repeat: a.repeat);
           await _maybeReliabilityTip();
+          if (a.repeat != null) {
+            final rep = {
+              'daily': {'bn': 'প্রতিদিন', 'hi': 'हर दिन', 'en': 'every day'},
+              'weekly': {'bn': 'প্রতি সপ্তাহে', 'hi': 'हर हफ़्ते', 'en': 'every week'},
+            }[a.repeat]![lang.code]!;
+            return said('reminder_repeat', {'rep': rep, 'x': '${_two(when.hour)}:${_two(when.minute)}'});
+          }
           return said('reminder', {'x': _timeText(when)});
 
         case ActionType.openApp:
@@ -329,15 +403,182 @@ class Executor {
         case ActionType.briefing:
           return await _briefing(lang);
 
-        default:
+        case ActionType.multi:
+          final results = <String>[];
+          for (final step in a.steps) {
+            if (step.type == ActionType.multi) {
+              continue;
+            }
+            results.add(await run(step, heard: heard, history: history));
+          }
+          return results.where((r) => r.trim().isNotEmpty).join(' ');
+
+        case ActionType.remember:
+          final fact = (a.message ?? a.query ?? '').trim();
+          if (fact.isEmpty) {
+            return phrase('failed', lang);
+          }
+          await Memory.instance.add(fact);
+          return said('remembered');
+
+        case ActionType.forget:
+          final what = (a.query ?? a.message ?? '').trim();
+          final n = what.isEmpty ? 0 : await Memory.instance.forget(what);
+          return phrase(n > 0 ? 'forgot' : 'forget_none', lang);
+
+        case ActionType.recall:
+          final items = Memory.instance.items;
+          if (items.isEmpty) {
+            return phrase('recall_none', lang);
+          }
           if (a.reply.isNotEmpty) {
             return a.reply;
+          }
+          final last = items.length > 8 ? items.sublist(items.length - 8) : items;
+          return phrase('recall_some', lang, {'x': last.map((m) => m.text).join('. ')});
+
+        case ActionType.readMessages:
+          return await _readMessages(a, lang);
+
+        case ActionType.replyMessage:
+          return await _replyMessage(a, lang);
+
+        case ActionType.phone:
+          return await _phone(a.setting ?? '', lang);
+
+        case ActionType.interpreter:
+          await ui.openInterpreter();
+          return said('interpreter');
+
+        default:
+          // Fresh facts from the web when the AI says the answer needs them.
+          if (a.live && settings.hasAi && heard.isNotEmpty) {
+            try {
+              return await gemini.liveAnswer(heard, history, lang);
+            } catch (e) {
+              debugPrint('Live answer failed: $e');
+            }
+          }
+          if (a.reply.isNotEmpty) {
+            return a.reply;
+          }
+          // No AI: maybe it's about something the user asked Maya to remember.
+          final found = Memory.instance.search(heard);
+          if (found.isNotEmpty) {
+            return phrase('memory_answer', lang, {'x': found.take(2).map((m) => m.text).join('. ')});
           }
           return phrase('need_ai', lang);
       }
     } catch (e) {
       debugPrint('Action ${a.type} failed: $e');
       return phrase('failed', lang);
+    }
+  }
+
+  /// Messages already read aloud (so "read my messages" only reads new ones).
+  final _readIds = <int>{};
+
+  Future<String> _readMessages(AssistantAction a, AppLanguage lang) async {
+    if (!await Messages.hasAccess()) {
+      await Messages.openAccessSettings();
+      return phrase('msg_access', lang);
+    }
+    var list = await Messages.recent();
+    final from = a.contact?.trim();
+    if (from != null && from.isNotEmpty) {
+      final want = from.toLowerCase();
+      list = list
+          .where((m) =>
+              m.sender.toLowerCase().contains(want) || ContactFinder.soundsLike(want, m.sender.toLowerCase()) > 0)
+          .toList();
+    } else {
+      final cutoff = DateTime.now().subtract(const Duration(hours: 24));
+      list = list.where((m) => !_readIds.contains(m.id) && m.time.isAfter(cutoff)).toList();
+    }
+    if (list.isEmpty) {
+      return from != null && from.isNotEmpty ? phrase('msg_none_from', lang, {'x': from}) : phrase('msg_none', lang);
+    }
+    final newest = list.length > 6 ? list.sublist(list.length - 6) : list;
+    _readIds.addAll(newest.map((m) => m.id));
+    Messages.lastRead = newest.last;
+    final spoken = newest.map((m) => '${m.sender}, ${m.app}: ${m.text}.').join(' ');
+    return '$spoken ${newest.last.canReply ? phrase('msg_reply_hint', lang) : ''}'.trim();
+  }
+
+  Future<String> _replyMessage(AssistantAction a, AppLanguage lang) async {
+    var target = Messages.lastRead;
+    final who = a.contact?.trim().toLowerCase();
+    if (who != null && who.isNotEmpty) {
+      final list = await Messages.recent();
+      final matches = list
+          .where((m) => m.sender.toLowerCase().contains(who) || ContactFinder.soundsLike(who, m.sender.toLowerCase()) > 0)
+          .toList();
+      if (matches.isNotEmpty) {
+        target = matches.last;
+      }
+    }
+    if (target == null) {
+      return phrase('msg_who', lang);
+    }
+    final text = (a.message ?? '').trim();
+    if (text.isEmpty) {
+      return phrase('msg_what', lang);
+    }
+    if (!target.canReply) {
+      return phrase('msg_cant_reply', lang);
+    }
+    if (!await ui.confirmSend(target.sender, text)) {
+      return phrase('cancelled', lang);
+    }
+    final ok = await Messages.reply(target, text);
+    return ok ? phrase('msg_sent', lang, {'x': target.sender}) : phrase('msg_cant_reply', lang);
+  }
+
+  Future<String> _phone(String setting, AppLanguage lang) async {
+    String names(String en, String bn, String hi) => {'bn': bn, 'hi': hi, 'en': en}[lang.code]!;
+    switch (setting) {
+      case 'torch_on':
+        return await PhoneControl.torch(true) ? phrase('torch_on', lang) : phrase('failed', lang);
+      case 'torch_off':
+        return await PhoneControl.torch(false) ? phrase('torch_off', lang) : phrase('failed', lang);
+      case 'volume_up':
+      case 'volume_down':
+      case 'volume_max':
+      case 'mute':
+        final how = setting == 'mute' ? 'mute' : setting.replaceFirst('volume_', '');
+        return await PhoneControl.volume(how) ? phrase('volume', lang) : phrase('failed', lang);
+      case 'vibrate':
+      case 'ring':
+        final ok = await PhoneControl.ringer(setting);
+        return ok
+            ? phrase('ringer', lang, {
+                'x': setting == 'vibrate' ? names('vibrate', 'ভাইব্রেট', 'वाइब्रेट') : names('ring', 'রিং', 'रिंग'),
+              })
+            : phrase('settings_open', lang, {'x': names('Do Not Disturb', 'বিরক্ত করবেন না', 'डू नॉट डिस्टर्ब')});
+      case 'battery':
+        final b = await PhoneControl.battery();
+        if (b == null) {
+          return phrase('failed', lang);
+        }
+        final charging = b.charging ? names(', charging', ', চার্জ হচ্ছে', ', चार्ज हो रही है') : '';
+        return phrase('battery', lang, {'x': '${b.level}', 'c': charging});
+      case 'wifi':
+      case 'bluetooth':
+      case 'dnd':
+      case 'brightness':
+      case 'data':
+        final label = {
+          'wifi': 'Wi-Fi',
+          'bluetooth': 'Bluetooth',
+          'dnd': names('Do Not Disturb', 'বিরক্ত করবেন না', 'डू नॉट डिस्टर्ब'),
+          'brightness': names('brightness', 'উজ্জ্বলতা', 'ब्राइटनेस'),
+          'data': names('mobile data', 'মোবাইল ডেটা', 'मोबाइल डेटा'),
+        }[setting] ?? setting;
+        return await PhoneControl.panel(setting)
+            ? phrase('settings_open', lang, {'x': label})
+            : phrase('failed', lang);
+      default:
+        return phrase('failed', lang);
     }
   }
 
@@ -368,7 +609,7 @@ class Executor {
     final remindersText = today.isEmpty
         ? phrase('briefing_none', lang)
         : phrase('briefing_some', lang, {
-            'x': today.map((r) => '${_two(r.when.hour)}:${_two(r.when.minute)} ${r.text}').join(', '),
+            'x': today.map((r) => '${_two(r.next.hour)}:${_two(r.next.minute)} ${r.text}').join(', '),
           });
     if (settings.hasAi) {
       try {

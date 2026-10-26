@@ -8,12 +8,32 @@ import 'package:timezone/timezone.dart' as tz;
 import '../settings.dart';
 
 class Reminder {
-  Reminder({required this.id, required this.text, required this.when});
+  Reminder({required this.id, required this.text, required this.when, this.repeat});
   final int id;
   final String text;
+
+  /// First time it fires.
   final DateTime when;
 
-  Map<String, dynamic> toJson() => {'id': id, 'text': text, 'when': when.toIso8601String()};
+  /// null (once), "daily" or "weekly".
+  final String? repeat;
+
+  /// The next time it fires (for repeating reminders, the next one from now).
+  DateTime get next {
+    if (repeat == null) {
+      return when;
+    }
+    final now = DateTime.now();
+    var t = when;
+    final step = repeat == 'weekly' ? const Duration(days: 7) : const Duration(days: 1);
+    while (!t.isAfter(now)) {
+      t = t.add(step);
+    }
+    return t;
+  }
+
+  Map<String, dynamic> toJson() =>
+      {'id': id, 'text': text, 'when': when.toIso8601String(), if (repeat != null) 'repeat': repeat};
 
   static Reminder? fromJson(dynamic j) {
     if (j is! Map) {
@@ -24,7 +44,13 @@ class Reminder {
     if (when == null || id is! int) {
       return null;
     }
-    return Reminder(id: id, text: '${j['text'] ?? ''}', when: when);
+    final repeat = j['repeat'];
+    return Reminder(
+      id: id,
+      text: '${j['text'] ?? ''}',
+      when: when,
+      repeat: repeat == 'daily' || repeat == 'weekly' ? repeat as String : null,
+    );
   }
 }
 
@@ -39,12 +65,12 @@ class Reminders extends ChangeNotifier {
 
   List<Reminder> get upcoming {
     final now = DateTime.now();
-    return _items.where((r) => r.when.isAfter(now)).toList()..sort((a, b) => a.when.compareTo(b.when));
+    return _items.where((r) => r.next.isAfter(now)).toList()..sort((a, b) => a.next.compareTo(b.next));
   }
 
   List<Reminder> get today {
     final now = DateTime.now();
-    return upcoming.where((r) => r.when.year == now.year && r.when.month == now.month && r.when.day == now.day).toList();
+    return upcoming.where((r) => r.next.year == now.year && r.next.month == now.month && r.next.day == now.day).toList();
   }
 
   Future<void> init() async {
@@ -66,7 +92,7 @@ class Reminders extends ChangeNotifier {
     }
     // Forget reminders that are long past.
     final cutoff = DateTime.now().subtract(const Duration(days: 1));
-    _items.removeWhere((r) => r.when.isBefore(cutoff));
+    _items.removeWhere((r) => r.repeat == null && r.when.isBefore(cutoff));
     await _save();
   }
 
@@ -87,10 +113,10 @@ class Reminders extends ChangeNotifier {
     }
   }
 
-  Future<Reminder> add(String text, DateTime when) async {
+  Future<Reminder> add(String text, DateTime when, {String? repeat}) async {
     await requestPermissions();
-    final id = DateTime.now().millisecondsSinceEpoch ~/ 1000 % 2000000000;
-    final reminder = Reminder(id: id, text: text, when: when);
+    final id = DateTime.now().millisecondsSinceEpoch ~/ 1000 % 2000000000 + _items.length;
+    final reminder = Reminder(id: id, text: text, when: when, repeat: repeat);
     final details = const NotificationDetails(
       android: AndroidNotificationDetails(
         'reminders',
@@ -110,6 +136,11 @@ class Reminders extends ChangeNotifier {
           details,
           androidScheduleMode: mode,
           uiLocalNotificationDateInterpretation: UILocalNotificationDateInterpretation.absoluteTime,
+          matchDateTimeComponents: switch (repeat) {
+            'daily' => DateTimeComponents.time,
+            'weekly' => DateTimeComponents.dayOfWeekAndTime,
+            _ => null,
+          },
         );
     try {
       await schedule(AndroidScheduleMode.exactAllowWhileIdle);

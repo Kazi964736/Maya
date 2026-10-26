@@ -6,6 +6,7 @@ import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 
 import '../settings.dart';
+import '../services/memory.dart';
 import 'action.dart';
 
 class GeminiException implements Exception {
@@ -59,6 +60,7 @@ class Gemini {
     required String system,
     required List<Map<String, dynamic>> contents,
     bool json = false,
+    bool search = false,
   }) async {
     if (!settings.hasAi) {
       throw GeminiException('No AI key set');
@@ -70,6 +72,10 @@ class Gemini {
         ],
       },
       'contents': contents,
+      if (search)
+        'tools': [
+          {'google_search': <String, dynamic>{}},
+        ],
       'generationConfig': {
         'temperature': 0.4,
         if (json) 'responseMimeType': 'application/json',
@@ -218,29 +224,43 @@ class Gemini {
     return '${days[n.weekday - 1]} ${n.year}-${two(n.month)}-${two(n.day)} ${two(n.hour)}:${two(n.minute)}';
   }
 
-  /// Turns what the user said into an action plus a spoken reply.
+  /// Turns what the user said into one or more actions plus a spoken reply.
   Future<AssistantAction> understand(String text, List<ChatTurn> history, AppLanguage lang) async {
     final name = settings.userName.isEmpty ? '' : ' The user\'s name is ${settings.userName}.';
     final system = '''
-You are Maya, a friendly voice assistant on an Android phone in India.$name
+You are Maya, a smart, warm voice assistant on an Android phone in India.$name
 The user speaks ${_languageNames[lang.code]}, often mixed with English words. Reply in ${_languageNames[lang.code]}.
 Current local date and time: ${_now()}. The user's city: ${settings.city}.
+${Memory.instance.promptBlock()}
+Return ONLY a JSON object: {"steps": [ ...one object per thing to do, in order... ], "reply": "..."}
+Usually there is one step. Use several only when the user clearly asks for several things in one sentence.
+Each step has these keys (null when not used):
+- "action": one of "call", "alarm", "timer", "reminder", "open_app", "whatsapp", "navigate", "weather", "briefing",
+  "search", "answer", "remember", "forget", "recall", "read_messages", "reply_message", "phone", "interpreter"
+- "contact": person's name exactly as the user said it (call / whatsapp / reply_message / read_messages from someone)
+- "message": WhatsApp text, reply text, what to remind about, or the fact to remember (keep the user's language;
+  for remember, write it as a full sentence about the user, e.g. "My bike is parked on level B2")
+- "hour", "minute": alarm time on a 24-hour clock (e.g. "6 in the evening" -> 18, 0)
+- "seconds": timer length in seconds
+- "when": reminder time as local ISO "YYYY-MM-DDTHH:MM:00", worked out from the current time
+- "repeat": "daily" or "weekly" for repeating reminders ("every day", "every Monday"), else null
+- "app": app name in English (e.g. "YouTube", "PhonePe", "Camera")
+- "place": destination for navigate, or a city for weather if the user named one
+- "query": what to search for, or what to forget
+- "setting": for "phone": one of torch_on, torch_off, volume_up, volume_down, volume_max, mute, vibrate, ring,
+  battery, wifi, bluetooth, dnd, brightness, data
+- "live": true for "answer" when the answer needs fresh facts from the internet (news, scores, prices, weather
+  elsewhere, train status, results, anything after your knowledge or that changes often), else false
+- "reply": short spoken text for this step
 
-Decide what the user wants and return ONLY a JSON object with these keys:
-- "action": one of "call", "alarm", "timer", "reminder", "open_app", "whatsapp", "navigate", "weather", "briefing", "search", "answer"
-- "contact": person's name exactly as the user said it (for call / whatsapp), else null
-- "message": text to send on WhatsApp, or what to remind about (keep the user's language), else null
-- "hour", "minute": alarm time on a 24-hour clock (e.g. "6 in the evening" -> 18, 0), else null
-- "seconds": timer length in seconds, else null
-- "when": reminder time as local ISO "YYYY-MM-DDTHH:MM:00", worked out from the current time, else null
-- "app": app name in English (e.g. "YouTube", "PhonePe", "Camera"), else null
-- "place": destination for navigate, or a city for weather if the user named one, else null
-- "query": what to search the web for, else null
-- "reply": a short, warm spoken reply (1-3 sentences, no markdown, no emojis). For "answer", this IS the answer:
-  helpful, accurate and brief enough to listen to. For other actions, say what you are doing.
+Top-level "reply": a short, warm spoken reply (1-3 sentences, no markdown, no emojis). For a single "answer" this IS
+the answer: helpful, accurate and brief enough to listen to. For other actions, say what you are doing.
 
-Rules: "briefing" is for good-morning / what's my day. "search" only if the user asks to search the web.
-For time-sensitive facts you cannot know (live scores, today's news, prices), say so briefly and suggest "search".
+Rules: "briefing" = good morning / what's my day. "search" only if the user asks to open a web search.
+"remember" when the user says remember / note / মনে রেখো / याद रखना. "recall" when they ask what you remember
+in general (answer specific questions about remembered facts directly with "answer").
+"read_messages" for "read my messages / who messaged me". "reply_message" to reply to a message just read.
+"interpreter" when they want you to translate a conversation between two people.
 Never invent phone numbers. If unsure what they want, use "answer" and ask a short question.''';
 
     final contents = <Map<String, dynamic>>[
@@ -268,6 +288,46 @@ Never invent phone numbers. If unsure what they want, use "answer" and ask a sho
       // Not JSON after all: treat it as a plain answer.
       return AssistantAction(type: ActionType.answer, reply: raw);
     }
+  }
+
+  /// Answers with fresh facts from Google Search. Falls back to a normal answer.
+  Future<String> liveAnswer(String question, List<ChatTurn> history, AppLanguage lang) async {
+    final system = 'You are Maya, a voice assistant in India. Current local date and time: ${_now()}. '
+        "The user's city: ${settings.city}. Use Google Search to answer with up-to-date facts. "
+        'Reply in ${_languageNames[lang.code]}, in 1-4 short spoken sentences, no markdown, no links, no emojis. '
+        'Say numbers, scores and times clearly.${Memory.instance.promptBlock()}';
+    final contents = <Map<String, dynamic>>[
+      for (final t in history.length > 6 ? history.sublist(history.length - 6) : history)
+        {
+          'role': t.fromUser ? 'user' : 'model',
+          'parts': [
+            {'text': t.text},
+          ],
+        },
+      {
+        'role': 'user',
+        'parts': [
+          {'text': question},
+        ],
+      },
+    ];
+    return _generate(system: system, contents: contents, search: true);
+  }
+
+  /// Translates speech for the interpreter screen.
+  Future<String> translate(String text, String fromLanguage, String toLanguage) {
+    return _generate(
+      system: 'Translate what the user says from $fromLanguage to $toLanguage, the way a friendly human interpreter '
+          'would say it out loud. Keep names, numbers and the tone. Output only the translation, nothing else.',
+      contents: [
+        {
+          'role': 'user',
+          'parts': [
+            {'text': text},
+          ],
+        },
+      ],
+    );
   }
 
   /// Explains a photo (bill, letter, medicine strip, sign...) in the user's language.

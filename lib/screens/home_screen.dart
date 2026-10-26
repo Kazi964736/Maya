@@ -19,6 +19,7 @@ import '../services/wake_word.dart';
 import '../settings.dart';
 import '../ui/orb.dart';
 import '../ui/theme.dart';
+import 'interpreter_screen.dart';
 import 'reminders_screen.dart';
 import 'settings_screen.dart';
 
@@ -33,9 +34,30 @@ class ChatMessage {
 }
 
 const _suggestions = {
-  'bn': ['মা কে ফোন করো', 'সকাল ৬টায় অ্যালার্ম দাও', '১০ মিনিটের টাইমার', 'আজ আবহাওয়া কেমন?', 'সুপ্রভাত', 'হোয়াটসঅ্যাপ খোলো'],
-  'hi': ['माँ को फोन करो', 'सुबह 6 बजे का अलार्म लगाओ', '10 मिनट का टाइमर', 'आज मौसम कैसा है?', 'सुप्रभात', 'व्हाट्सएप खोलो'],
-  'en': ['Call Maa', 'Set an alarm for 6 am', '10 minute timer', "How's the weather today?", 'Good morning', 'Open WhatsApp'],
+  'bn': [
+    'মা কে ফোন করো',
+    'সকাল ৬টায় অ্যালার্ম দাও আর ৮টায় মাকে ফোনের কথা মনে করিয়ে দাও',
+    'মেসেজ পড়ো',
+    'টর্চ জ্বালাও',
+    'আজকের ক্রিকেট ম্যাচ কে জিতল?',
+    'মনে রেখো বাইক B2-তে রাখা আছে',
+  ],
+  'hi': [
+    'माँ को फोन करो',
+    'सुबह 6 बजे अलार्म लगाओ और 8 बजे माँ को फोन करना याद दिलाओ',
+    'मैसेज पढ़ो',
+    'टॉर्च जलाओ',
+    'आज क्रिकेट मैच कौन जीता?',
+    'याद रखना बाइक B2 पर खड़ी है',
+  ],
+  'en': [
+    'Call Maa',
+    'Alarm at 6 am and remind me to call Maa at 8',
+    'Read my messages',
+    'Turn on the torch',
+    'Who won the cricket match today?',
+    'Remember my bike is on level B2',
+  ],
 };
 
 class HomeScreen extends StatefulWidget {
@@ -281,7 +303,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver imp
       action = _parser.parse(trimmed);
     }
 
-    var reply = await executor.run(action);
+    var reply = await executor.run(action, heard: trimmed, history: history);
     if (aiProblem != null && action.type == ActionType.answer) {
       reply = aiProblem;
     }
@@ -294,7 +316,8 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver imp
     if (settings.speakReplies) {
       await voice.speak(reply, lang);
     }
-    final keepTalking = {ActionType.answer, ActionType.weather, ActionType.briefing}.contains(action.type);
+    final keepTalking = {ActionType.answer, ActionType.weather, ActionType.briefing, ActionType.readMessages, ActionType.recall}
+        .contains(action.type);
     if (settings.conversationMode && keepTalking && mounted) {
       _listen();
     }
@@ -419,6 +442,50 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver imp
       ),
     );
     return go ?? false;
+  }
+
+  @override
+  Future<bool> confirmSend(String to, String text) async {
+    if (!mounted) {
+      return false;
+    }
+    await voice.stopSpeaking();
+    if (!mounted) {
+      return false;
+    }
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        icon: const Icon(Icons.send_rounded, color: MayaColors.violet),
+        title: Text(_t('Send to $to?', '$to-কে পাঠাব?', '$to को भेजूँ?'), textAlign: TextAlign.center),
+        content: Text('“$text”', textAlign: TextAlign.center, style: const TextStyle(fontSize: 17)),
+        actionsAlignment: MainAxisAlignment.spaceBetween,
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text(_t('Cancel', 'বাতিল', 'रद्द करें'))),
+          FilledButton.icon(
+            onPressed: () => Navigator.pop(ctx, true),
+            icon: const Icon(Icons.send_rounded),
+            label: Text(_t('Send', 'পাঠাও', 'भेजो')),
+          ),
+        ],
+      ),
+    );
+    return ok ?? false;
+  }
+
+  @override
+  Future<void> openInterpreter() async {
+    if (!mounted) {
+      return;
+    }
+    await voice.stopSpeaking();
+    if (!mounted) {
+      return;
+    }
+    wake.pause();
+    unawaited(
+      Navigator.push(context, MaterialPageRoute(builder: (_) => const InterpreterScreen())).whenComplete(wake.resume),
+    );
   }
 
   @override
@@ -987,12 +1054,19 @@ class _Welcome extends StatelessWidget {
   static const _icons = [
     Icons.call_rounded,
     Icons.alarm_rounded,
-    Icons.timer_outlined,
-    Icons.cloud_outlined,
-    Icons.wb_sunny_outlined,
-    Icons.chat_rounded,
+    Icons.mark_chat_unread_rounded,
+    Icons.flashlight_on_rounded,
+    Icons.sports_cricket_rounded,
+    Icons.bookmark_rounded,
   ];
-  static const _tints = [MayaColors.cyan, MayaColors.pink, MayaColors.amber, MayaColors.violet, MayaColors.amber, Color(0xFF22C55E)];
+  static const _tints = [
+    MayaColors.cyan,
+    MayaColors.pink,
+    Color(0xFF22C55E),
+    MayaColors.amber,
+    MayaColors.violet,
+    MayaColors.cyan,
+  ];
 
   @override
   Widget build(BuildContext context) {

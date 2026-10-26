@@ -3,12 +3,14 @@ import 'package:android_intent_plus/flag.dart';
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../services/device.dart';
 import '../services/phone_brand.dart';
 import '../services/voice_id.dart';
 import '../services/wake_word.dart';
 import '../settings.dart';
 import '../ui/theme.dart';
 import 'hands_free_screen.dart';
+import 'memories_screen.dart';
 import 'voice_id_screen.dart';
 
 class SettingsScreen extends StatefulWidget {
@@ -102,6 +104,38 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     setState(() {});
                   }
                 },
+              ),
+            ),
+            Card(
+              child: ListTile(
+                leading: const Icon(Icons.bookmark_rounded, color: MayaColors.cyan),
+                title: const Text("Maya's memory", style: TextStyle(fontWeight: FontWeight.w600)),
+                subtitle: const Text('Things you asked Maya to remember'),
+                trailing: const Icon(Icons.chevron_right_rounded),
+                onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const MemoriesScreen())),
+              ),
+            ),
+            Card(
+              child: FutureBuilder<bool>(
+                future: Messages.hasAccess(),
+                builder: (_, snap) => ListTile(
+                  leading: const Icon(Icons.mark_chat_unread_rounded, color: MayaColors.amber),
+                  title: const Text('Read & reply messages', style: TextStyle(fontWeight: FontWeight.w600)),
+                  subtitle: Text(
+                    snap.data == true
+                        ? 'On — say "read my messages"'
+                        : 'Allow Notification access. If Android says "restricted setting": App info › ⋮ › Allow restricted settings',
+                  ),
+                  trailing: snap.data == true
+                      ? const Icon(Icons.check_circle_rounded, color: Color(0xFF22C55E))
+                      : const Icon(Icons.chevron_right_rounded),
+                  onTap: () async {
+                    await Messages.openAccessSettings();
+                    if (mounted) {
+                      setState(() {});
+                    }
+                  },
+                ),
               ),
             ),
             const SizedBox(height: 20),
