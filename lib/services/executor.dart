@@ -10,6 +10,7 @@ import '../settings.dart';
 import 'apps.dart';
 import 'contacts.dart';
 import 'device.dart';
+import 'lists.dart';
 import 'memory.dart';
 import 'phone_brand.dart';
 import 'reminders.dart';
@@ -17,7 +18,7 @@ import 'weather.dart';
 
 /// Replies used when there is no AI to phrase them. {x} is filled in.
 const _phrases = <String, Map<String, String>>{
-  'calling': {'bn': '{x} কে ফোন করছি।', 'hi': '{x} को फोन कर रहा हूँ।', 'en': 'Calling {x}.'},
+  'calling': {'bn': '{x} কে ফোন করছি।', 'hi': '{x} को फोन कर रही हूँ।', 'en': 'Calling {x}.'},
   'no_contact': {
     'bn': '{x} নামে কোনো নম্বর খুঁজে পেলাম না।',
     'hi': '{x} नाम का कोई नंबर नहीं मिला।',
@@ -28,7 +29,7 @@ const _phrases = <String, Map<String, String>>{
   'timer': {'bn': '{x} এর টাইমার চালু করলাম।', 'hi': '{x} का टाइमर शुरू कर दिया।', 'en': 'Timer started for {x}.'},
   'reminder': {
     'bn': 'ঠিক আছে, {x} মনে করিয়ে দেব।',
-    'hi': 'ठीक है, {x} याद दिला दूँगा।',
+    'hi': 'ठीक है, {x} याद दिला दूँगी।',
     'en': "Okay, I'll remind you {x}.",
   },
   'reminder_when': {
@@ -36,19 +37,19 @@ const _phrases = <String, Map<String, String>>{
     'hi': 'कब याद दिलाऊँ? जैसे: "10 मिनट बाद" या "शाम 6 बजे"।',
     'en': 'When should I remind you? For example "in 10 minutes" or "at 6 pm".',
   },
-  'opening': {'bn': '{x} খুলছি।', 'hi': '{x} खोल रहा हूँ।', 'en': 'Opening {x}.'},
+  'opening': {'bn': '{x} খুলছি।', 'hi': '{x} खोल रही हूँ।', 'en': 'Opening {x}.'},
   'no_app': {
     'bn': '{x} ফোনে নেই মনে হচ্ছে, প্লে স্টোরে খুঁজছি।',
-    'hi': '{x} फोन में नहीं लगता, प्ले स्टोर में ढूँढ रहा हूँ।',
+    'hi': '{x} फोन में नहीं लगता, प्ले स्टोर में ढूँढ रही हूँ।',
     'en': "{x} doesn't seem to be installed, searching Play Store.",
   },
   'whatsapp': {
     'bn': 'হোয়াটসঅ্যাপ খুলছি, পাঠাতে সেন্ড চাপুন।',
-    'hi': 'व्हाट्सएप खोल रहा हूँ, भेजने के लिए सेंड दबाइए।',
+    'hi': 'व्हाट्सएप खोल रही हूँ, भेजने के लिए सेंड दबाइए।',
     'en': 'Opening WhatsApp. Tap Send to send it.',
   },
-  'navigate': {'bn': '{x} এর রাস্তা দেখাচ্ছি।', 'hi': '{x} का रास्ता दिखा रहा हूँ।', 'en': 'Showing directions to {x}.'},
-  'search': {'bn': '{x} খুঁজছি।', 'hi': '{x} खोज रहा हूँ।', 'en': 'Searching for {x}.'},
+  'navigate': {'bn': '{x} এর রাস্তা দেখাচ্ছি।', 'hi': '{x} का रास्ता दिखा रही हूँ।', 'en': 'Showing directions to {x}.'},
+  'search': {'bn': '{x} খুঁজছি।', 'hi': '{x} खोज रही हूँ।', 'en': 'Searching for {x}.'},
   'weather': {
     'bn': '{place} এ এখন {temp}°, সর্বোচ্চ {max}°, সর্বনিম্ন {min}°, বৃষ্টির সম্ভাবনা {rain}%।',
     'hi': '{place} में अभी {temp}°, अधिकतम {max}°, न्यूनतम {min}°, बारिश की संभावना {rain}%।',
@@ -68,7 +69,7 @@ const _phrases = <String, Map<String, String>>{
   },
   'no_contacts_permission': {
     'bn': 'কন্টাক্ট দেখার অনুমতি দিলে তবেই নাম ধরে ফোন করতে পারব।',
-    'hi': 'कॉन्टैक्ट देखने की अनुमति देंगे तभी नाम से फोन कर पाऊँगा।',
+    'hi': 'कॉन्टैक्ट देखने की अनुमति देंगे तभी नाम से फोन कर पाऊँगी।',
     'en': 'Allow access to contacts so I can call people by name.',
   },
   'cancelled': {'bn': 'ঠিক আছে, বাতিল করলাম।', 'hi': 'ठीक है, रद्द कर दिया।', 'en': 'Okay, cancelled.'},
@@ -84,11 +85,11 @@ const _phrases = <String, Map<String, String>>{
   },
   'reminder_repeat': {
     'bn': 'ঠিক আছে, {rep} {x} টায় মনে করিয়ে দেব।',
-    'hi': 'ठीक है, {rep} {x} बजे याद दिला दूँगा।',
+    'hi': 'ठीक है, {rep} {x} बजे याद दिला दूँगी।',
     'en': "Okay, I'll remind you {rep} at {x}.",
   },
   'remembered': {'bn': 'মনে রাখলাম।', 'hi': 'याद रख लिया।', 'en': "Got it, I'll remember that."},
-  'forgot': {'bn': 'ভুলে গেলাম।', 'hi': 'भूल गया।', 'en': 'Done, I forgot that.'},
+  'forgot': {'bn': 'ভুলে গেলাম।', 'hi': 'भूल गई।', 'en': 'Done, I forgot that.'},
   'forget_none': {
     'bn': 'এমন কিছু মনে রাখা ছিল না।',
     'hi': 'ऐसा कुछ याद नहीं रखा था।',
@@ -103,7 +104,7 @@ const _phrases = <String, Map<String, String>>{
   'memory_answer': {'bn': 'আপনি বলেছিলেন: {x}', 'hi': 'आपने बताया था: {x}', 'en': 'You told me: {x}'},
   'msg_access': {
     'bn': 'মেসেজ পড়তে "নোটিফিকেশন অ্যাক্সেস" দিন। সেটিংস খুলছি, মায়া চালু করুন।',
-    'hi': 'मैसेज पढ़ने के लिए "नोटिफ़िकेशन एक्सेस" दीजिए। सेटिंग्स खोल रहा हूँ, माया चालू कीजिए।',
+    'hi': 'मैसेज पढ़ने के लिए "नोटिफ़िकेशन एक्सेस" दीजिए। सेटिंग्स खोल रही हूँ, माया चालू कीजिए।',
     'en': 'To read messages, allow "Notification access" for Maya. Opening that setting now.',
   },
   'msg_none': {
@@ -138,11 +139,16 @@ const _phrases = <String, Map<String, String>>{
     'hi': 'बैटरी {x}%{c}।',
     'en': 'Battery is at {x}%{c}.',
   },
-  'settings_open': {'bn': '{x} সেটিং খুলছি।', 'hi': '{x} सेटिंग खोल रहा हूँ।', 'en': 'Opening {x} settings.'},
-  'interpreter': {'bn': 'দোভাষী মোড খুলছি।', 'hi': 'दुभाषिया मोड खोल रहा हूँ।', 'en': 'Opening interpreter mode.'},
+  'settings_open': {'bn': '{x} সেটিং খুলছি।', 'hi': '{x} सेटिंग खोल रही हूँ।', 'en': 'Opening {x} settings.'},
+  'interpreter': {'bn': 'দোভাষী মোড খুলছি।', 'hi': 'दुभाषिया मोड खोल रही हूँ।', 'en': 'Opening interpreter mode.'},
+  'list_added': {'bn': '{list} লিস্টে যোগ করলাম: {x}।', 'hi': '{list} लिस्ट में जोड़ दिया: {x}।', 'en': 'Added to your {list} list: {x}.'},
+  'list_read': {'bn': '{list} লিস্টে আছে: {x}।', 'hi': '{list} लिस्ट में है: {x}।', 'en': 'On your {list} list: {x}.'},
+  'list_empty': {'bn': '{list} লিস্ট খালি।', 'hi': '{list} लिस्ट खाली है।', 'en': 'Your {list} list is empty.'},
+  'list_removed': {'bn': '{x} সরিয়ে দিলাম।', 'hi': '{x} हटा दिया।', 'en': 'Removed {x}.'},
+  'list_cleared': {'bn': '{list} লিস্ট মুছে দিলাম।', 'hi': '{list} लिस्ट साफ़ कर दी।', 'en': 'Cleared your {list} list.'},
   'failed': {
     'bn': 'দুঃখিত, এটা করতে পারলাম না।',
-    'hi': 'माफ़ कीजिए, यह नहीं कर पाया।',
+    'hi': 'माफ़ कीजिए, यह नहीं कर पाई।',
     'en': "Sorry, I couldn't do that.",
   },
 };
@@ -445,6 +451,33 @@ class Executor {
 
         case ActionType.phone:
           return await _phone(a.setting ?? '', lang);
+
+        case ActionType.list:
+          final name = Lists.nameFor(a.query);
+          final shown = {
+                'shopping': {'bn': 'বাজারের', 'hi': 'शॉपिंग', 'en': 'shopping'},
+                'to-do': {'bn': 'কাজের', 'hi': 'काम की', 'en': 'to-do'},
+              }[name]?[lang.code] ??
+              name;
+          switch (a.setting) {
+            case 'add':
+              final added = await Lists.instance.add(name, a.message ?? '');
+              if (added.isEmpty) {
+                return phrase('failed', lang);
+              }
+              return phrase('list_added', lang, {'list': shown, 'x': added.join(', ')});
+            case 'remove':
+              final ok = await Lists.instance.remove(name, a.message ?? '');
+              return ok ? phrase('list_removed', lang, {'x': a.message ?? ''}) : phrase('failed', lang);
+            case 'clear':
+              await Lists.instance.clear(name);
+              return phrase('list_cleared', lang, {'list': shown});
+            default:
+              final items = Lists.instance.items(name);
+              return items.isEmpty
+                  ? phrase('list_empty', lang, {'list': shown})
+                  : phrase('list_read', lang, {'list': shown, 'x': items.join(', ')});
+          }
 
         case ActionType.interpreter:
           await ui.openInterpreter();

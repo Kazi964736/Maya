@@ -224,7 +224,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver imp
     }
     final words = await voice.listen(settings.language);
     if (words.isNotEmpty && mounted) {
-      await _handle(words);
+      await _handle(words, fromVoice: true);
     }
   }
 
@@ -277,7 +277,20 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver imp
     return true;
   }
 
-  Future<void> _handle(String text, {AssistantAction? forced}) async {
+  /// Clear phone commands are done instantly on the phone, without asking the AI
+  /// (faster, works offline and saves free AI requests).
+  static const _instant = {
+    ActionType.phone,
+    ActionType.alarm,
+    ActionType.timer,
+    ActionType.openApp,
+    ActionType.readMessages,
+    ActionType.interpreter,
+    ActionType.briefing,
+    ActionType.list,
+  };
+
+  Future<void> _handle(String text, {AssistantAction? forced, bool fromVoice = false}) async {
     final trimmed = text.trim();
     if (trimmed.isEmpty || _busy) {
       return;
@@ -293,11 +306,16 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver imp
     if (forced != null) {
       action = forced;
     } else if (settings.hasAi) {
-      try {
-        action = await gemini.understand(trimmed, history, lang);
-      } on GeminiException catch (e) {
-        aiProblem = e.message;
-        action = _parser.parse(trimmed);
+      final quick = _parser.parse(trimmed);
+      if (_instant.contains(quick.type)) {
+        action = quick;
+      } else {
+        try {
+          action = await gemini.understand(trimmed, history, lang);
+        } on GeminiException catch (e) {
+          aiProblem = e.message;
+          action = quick;
+        }
       }
     } else {
       action = _parser.parse(trimmed);
@@ -318,7 +336,10 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver imp
     }
     final keepTalking = {ActionType.answer, ActionType.weather, ActionType.briefing, ActionType.readMessages, ActionType.recall}
         .contains(action.type);
-    if (settings.conversationMode && keepTalking && mounted) {
+    // Maya asked something back ("Which Rahul?", "What time?"): listen for the answer,
+    // like a person would, even when conversation mode is off.
+    final askedBack = fromVoice && RegExp(r'[?？]\s*$').hasMatch(reply.trim());
+    if (((settings.conversationMode && keepTalking) || askedBack) && mounted) {
       _listen();
     }
   }

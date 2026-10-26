@@ -2,6 +2,7 @@ import 'package:maya/brain/action.dart';
 import 'package:maya/brain/rule_parser.dart';
 import 'package:maya/services/apps.dart';
 import 'package:maya/services/contacts.dart';
+import 'package:maya/services/lists.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
@@ -40,6 +41,15 @@ void main() {
       expect(p('volume up').setting, 'volume_up');
       expect(p('आवाज़ कम करो').setting, 'volume_down');
       expect(p('how much battery is left').setting, 'battery');
+    });
+    test('lists', () {
+      final a = p('add milk, eggs and bread to my shopping list');
+      expect(a.type, ActionType.list);
+      expect(a.setting, 'add');
+      expect(a.message, 'milk, eggs and bread');
+      expect(p("what's on my shopping list").setting, 'read');
+      expect(p('বাজারের লিস্টে ডিম আর দুধ যোগ করো').setting, 'add');
+      expect(p('clear my shopping list').setting, 'clear');
     });
     test('messages', () {
       expect(p('read my messages').type, ActionType.readMessages);
@@ -187,6 +197,12 @@ void main() {
       expect(packageForApp('phone pe'), 'com.phonepe.app');
       expect(packageForApp('ইউটিউব'), 'com.google.android.youtube');
       expect(packageForApp('some random thing'), isNull);
+    });
+    test('list names and items', () {
+      expect(Lists.nameFor('বাজারের'), 'shopping');
+      expect(Lists.nameFor('shopping'), 'shopping');
+      expect(Lists.splitItems('milk, eggs and bread'), ['milk', 'eggs', 'bread']);
+      expect(Lists.splitItems('ডিম আর দুধ'), ['ডিম', 'দুধ']);
     });
     test('names that sound alike', () {
       expect(ContactFinder.soundsLike('noushad', 'naushad ali'), greaterThan(0));

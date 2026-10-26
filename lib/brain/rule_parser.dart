@@ -100,6 +100,12 @@ class RuleParser {
       return memory;
     }
 
+    // Lists need the commas between items, which normalize() removes.
+    final list = _list(spoken.toLowerCase().replaceAll(RegExp(r'[।?!]'), ' ').replaceAll(RegExp(r'\s+'), ' ').trim());
+    if (list != null) {
+      return list;
+    }
+
     if (_hasAny(text, _timerWords)) {
       final seconds = _duration(text);
       if (seconds != null) {
@@ -202,6 +208,41 @@ class RuleParser {
     if (RegExp(r'what do you remember|what have you remembered|কী মনে রেখেছ|কি মনে রেখেছ|क्या याद है|क्या याद रखा')
         .hasMatch(text)) {
       return const AssistantAction(type: ActionType.recall);
+    }
+    return null;
+  }
+
+  static AssistantAction? _list(String text) {
+    AssistantAction make(String setting, String? list, [String? items]) =>
+        AssistantAction(type: ActionType.list, setting: setting, query: list, message: items);
+
+    final add = RegExp(r'^(?:please\s+)?(?:add|put)\s+(.+?)\s+(?:to|on|in)\s+(?:my\s+|the\s+)?(.+?)\s*list$').firstMatch(text);
+    if (add != null) {
+      return make('add', add.group(2), add.group(1));
+    }
+    final addBn = RegExp(r'^(.*?)\s*(?:লিস্টে|ফর্দে|তালিকা\S*)\s+(.+?)\s+(?:যোগ করো|যোগ কর|লেখো|লিখে রাখো|রাখো)$').firstMatch(text);
+    if (addBn != null) {
+      return make('add', addBn.group(1), addBn.group(2));
+    }
+    final addHi = RegExp(r'^(.*?)\s*(?:लिस्ट|सूची)\s+में\s+(.+?)\s+(?:जो\S*|डालो|लिखो|लिख दो)$').firstMatch(text);
+    if (addHi != null) {
+      return make('add', addHi.group(1), addHi.group(2));
+    }
+    final remove = RegExp(r'^(?:remove|delete|take)\s+(.+?)\s+(?:from|off)\s+(?:my\s+|the\s+)?(.+?)\s*list$').firstMatch(text);
+    if (remove != null) {
+      return make('remove', remove.group(2), remove.group(1));
+    }
+    final clear = RegExp(r'^(?:clear|empty|delete)\s+(?:my\s+|the\s+)?(.+?)\s*list$').firstMatch(text);
+    if (clear != null) {
+      return make('clear', clear.group(1));
+    }
+    final read = RegExp(r"(?:what'?s|what is|read|show|tell me)\s+(?:on\s+|in\s+)?(?:my\s+|the\s+)?(.+?)\s*list").firstMatch(text);
+    if (read != null) {
+      return make('read', read.group(1));
+    }
+    final readOther = RegExp(r'^(.*?)\s*(?:লিস্টে|ফর্দে|তালিকা\S*|लिस्ट में|सूची में)\s+(?:কী|কি|क्या)').firstMatch(text);
+    if (readOther != null) {
+      return make('read', readOther.group(1));
     }
     return null;
   }

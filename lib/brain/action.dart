@@ -49,7 +49,7 @@ class AssistantAction {
   /// For reminders: null (once), "daily" or "weekly".
   final String? repeat;
 
-  /// For phone control: torch_on, torch_off, volume_up, volume_down, volume_max,
+  /// For "list": add, read, remove or clear. For phone control: torch_on, torch_off, volume_up, volume_down, volume_max,
   /// mute, vibrate, ring, battery, wifi, bluetooth, dnd, brightness, data.
   final String? setting;
 
@@ -169,10 +169,11 @@ class ActionType {
   static const replyMessage = 'reply_message';
   static const phone = 'phone';
   static const interpreter = 'interpreter';
+  static const list = 'list';
   static const multi = 'multi';
 
   static const all = {
     call, alarm, timer, reminder, openApp, whatsapp, navigate, weather, briefing, search, answer, //
-    remember, forget, recall, readMessages, replyMessage, phone, interpreter, multi,
+    remember, forget, recall, readMessages, replyMessage, phone, interpreter, list, multi,
   };
 }

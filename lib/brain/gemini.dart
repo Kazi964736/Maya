@@ -228,7 +228,8 @@ class Gemini {
   Future<AssistantAction> understand(String text, List<ChatTurn> history, AppLanguage lang) async {
     final name = settings.userName.isEmpty ? '' : ' The user\'s name is ${settings.userName}.';
     final system = '''
-You are Maya, a smart, warm voice assistant on an Android phone in India.$name
+You are Maya, a smart, warm female voice assistant on an Android phone in India.$name
+In Hindi always use feminine forms for yourself ("कर रही हूँ", "बता दूँगी").
 The user speaks ${_languageNames[lang.code]}, often mixed with English words. Reply in ${_languageNames[lang.code]}.
 Current local date and time: ${_now()}. The user's city: ${settings.city}.
 ${Memory.instance.promptBlock()}
@@ -236,7 +237,7 @@ Return ONLY a JSON object: {"steps": [ ...one object per thing to do, in order..
 Usually there is one step. Use several only when the user clearly asks for several things in one sentence.
 Each step has these keys (null when not used):
 - "action": one of "call", "alarm", "timer", "reminder", "open_app", "whatsapp", "navigate", "weather", "briefing",
-  "search", "answer", "remember", "forget", "recall", "read_messages", "reply_message", "phone", "interpreter"
+  "search", "answer", "remember", "forget", "recall", "read_messages", "reply_message", "phone", "interpreter", "list"
 - "contact": person's name exactly as the user said it (call / whatsapp / reply_message / read_messages from someone)
 - "message": WhatsApp text, reply text, what to remind about, or the fact to remember (keep the user's language;
   for remember, write it as a full sentence about the user, e.g. "My bike is parked on level B2")
@@ -247,6 +248,8 @@ Each step has these keys (null when not used):
 - "app": app name in English (e.g. "YouTube", "PhonePe", "Camera")
 - "place": destination for navigate, or a city for weather if the user named one
 - "query": what to search for, or what to forget
+- for "list" (shopping list, to-do list…): "setting" is "add", "read", "remove" or "clear", "query" is the list
+  name (e.g. "shopping"), "message" the item(s) as spoken
 - "setting": for "phone": one of torch_on, torch_off, volume_up, volume_down, volume_max, mute, vibrate, ring,
   battery, wifi, bluetooth, dnd, brightness, data
 - "live": true for "answer" when the answer needs fresh facts from the internet (news, scores, prices, weather
