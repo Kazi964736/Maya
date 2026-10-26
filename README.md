@@ -1,4 +1,4 @@
-# Bolo 🎙️ (বলো / बोलो)
+# Maya 🎙️
 
 A voice assistant for Android that understands **Bengali, Hindi and English**.
 
@@ -25,10 +25,10 @@ allow third-party assistants, so a long-press of home/power opens it listening.
 
 ## Build
 
-Codemagic builds it automatically from `codemagic.yaml` (start "Bolo – test APK"). Locally, with Flutter 3.27+:
+Codemagic builds it automatically from `codemagic.yaml` (start "Maya – test APK"). Locally, with Flutter 3.27+:
 
 ```
-flutter create --org com.boloai --platforms android --project-name bolo .
+flutter create --org com.mayaai --platforms android --project-name maya .
 rm -f test/widget_test.dart
 python3 tool/prepare_android.py
 flutter pub get

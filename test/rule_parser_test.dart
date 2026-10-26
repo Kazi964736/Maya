@@ -1,7 +1,7 @@
-import 'package:bolo/brain/action.dart';
-import 'package:bolo/brain/rule_parser.dart';
-import 'package:bolo/services/apps.dart';
-import 'package:bolo/services/contacts.dart';
+import 'package:maya/brain/action.dart';
+import 'package:maya/brain/rule_parser.dart';
+import 'package:maya/services/apps.dart';
+import 'package:maya/services/contacts.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
@@ -110,6 +110,12 @@ void main() {
       final a = p('navigate to berhampore station');
       expect(a.type, ActionType.navigate);
       expect(a.place, 'berhampore station');
+    });
+    test('ignores the wake word', () {
+      final a = p('Hey Maya, call Rahul');
+      expect(a.type, ActionType.call);
+      expect(a.contact, 'rahul');
+      expect(p('মায়া ১০ মিনিটের টাইমার').seconds, 600);
     });
     test('unknown becomes answer', () => expect(p('what is the capital of france').type, ActionType.answer));
   });

@@ -100,7 +100,7 @@ class Gemini {
   Future<AssistantAction> understand(String text, List<ChatTurn> history, AppLanguage lang) async {
     final name = settings.userName.isEmpty ? '' : ' The user\'s name is ${settings.userName}.';
     final system = '''
-You are Bolo, a friendly voice assistant on an Android phone in India.$name
+You are Maya, a friendly voice assistant on an Android phone in India.$name
 The user speaks ${_languageNames[lang.code]}, often mixed with English words. Reply in ${_languageNames[lang.code]}.
 Current local date and time: ${_now()}. The user's city: ${settings.city}.
 
@@ -151,7 +151,7 @@ Never invent phone numbers. If unsure what they want, use "answer" and ask a sho
   /// Explains a photo (bill, letter, medicine strip, sign...) in the user's language.
   Future<String> explainImage(Uint8List bytes, String mimeType, AppLanguage lang, {String? question}) {
     final system = '''
-You are Bolo, a helpful assistant in India. Reply in ${_languageNames[lang.code]}, simply, for someone who may not read English well.
+You are Maya, a helpful assistant in India. Reply in ${_languageNames[lang.code]}, simply, for someone who may not read English well.
 Explain what the photo shows. If it is a bill, letter, notice, prescription or form: say what it is, the key details
 (amounts, dates, deadlines, names), and what the person should do next. If it is medicine, say what it is commonly used
 for and remind them to follow their doctor's advice. Keep it under 120 words, no markdown.''';
@@ -174,7 +174,7 @@ for and remind them to follow their doctor's advice. Keep it under 120 words, no
   /// Rewrites plain facts (weather, briefing) as a natural spoken reply.
   Future<String> phrase(String facts, AppLanguage lang) {
     return _generate(
-      system: 'You are Bolo, a voice assistant. Turn these facts into a short, natural spoken reply in '
+      system: 'You are Maya, a voice assistant. Turn these facts into a short, natural spoken reply in '
           '${_languageNames[lang.code]}. No markdown, no emojis, under 70 words.',
       contents: [
         {

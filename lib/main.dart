@@ -14,19 +14,19 @@ Future<void> main() async {
   } catch (e) {
     debugPrint('Reminders init failed: $e');
   }
-  runApp(const BoloApp());
+  runApp(const MayaApp());
   // Speech set-up can show a permission prompt, so do it after the first frame.
   Voice.instance.init();
 }
 
-class BoloApp extends StatelessWidget {
-  const BoloApp({super.key});
+class MayaApp extends StatelessWidget {
+  const MayaApp({super.key});
 
   @override
   Widget build(BuildContext context) {
     const seed = Color(0xFF5B3CC4);
     return MaterialApp(
-      title: 'Bolo',
+      title: 'Maya',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
         colorScheme: ColorScheme.fromSeed(seedColor: seed),

@@ -15,7 +15,7 @@
     <uses-feature android:name="android.hardware.telephony" android:required="false" />
 
     <application
-        android:label="Bolo"
+        android:label="Maya"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
         <activity
@@ -35,7 +35,7 @@
                 <action android:name="android.intent.action.MAIN"/>
                 <category android:name="android.intent.category.LAUNCHER"/>
             </intent-filter>
-            <!-- Lets Bolo open from the assistant gesture (long-press home / power) -->
+            <!-- Lets Maya open from the assistant gesture (long-press home / power) -->
             <intent-filter>
                 <action android:name="android.intent.action.ASSIST" />
                 <category android:name="android.intent.category.DEFAULT" />

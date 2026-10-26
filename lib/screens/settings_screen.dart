@@ -131,7 +131,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
             SwitchListTile(
               contentPadding: EdgeInsets.zero,
               title: const Text('Start listening when opened'),
-              subtitle: const Text('Opening Bolo (or the assistant button) starts the mic'),
+              subtitle: const Text('Opening Maya (or the assistant button) starts the mic'),
               value: s.listenOnOpen,
               onChanged: (v) async {
                 await s.update(listenOnOpen: v);
@@ -158,12 +158,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
               },
             ),
             const SizedBox(height: 24),
-            Text('Make Bolo your phone\'s assistant', style: theme.textTheme.titleMedium),
+            Text('Make Maya your phone\'s assistant', style: theme.textTheme.titleMedium),
             const SizedBox(height: 4),
             Text(
-              'Open Default apps → Digital assistant app (or "Assist app") and choose Bolo. Then long-press the home '
-              'button or the power button to start Bolo. Not every phone brand lists third-party assistants; '
-              'if Bolo is missing there, add the app to your home screen instead.',
+              'Open Default apps → Digital assistant app (or "Assist app") and choose Maya. Then long-press the home '
+              'button or the power button to start Maya. Not every phone brand lists third-party assistants; '
+              'if Maya is missing there, add the app to your home screen instead.',
               style: theme.textTheme.bodySmall,
             ),
             Align(
@@ -176,7 +176,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
             ),
             const SizedBox(height: 16),
             Text(
-              'Voices: if Bolo speaks English instead of Bengali or Hindi, open phone Settings → Text-to-speech → '
+              'Voices: if Maya speaks English instead of Bengali or Hindi, open phone Settings → Text-to-speech → '
               'Speech Services by Google and install the language.',
               style: theme.textTheme.bodySmall,
             ),

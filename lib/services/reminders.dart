@@ -104,7 +104,7 @@ class Reminders extends ChangeNotifier {
     final at = tz.TZDateTime.from(when.toUtc(), tz.UTC);
     Future<void> schedule(AndroidScheduleMode mode) => _plugin.zonedSchedule(
           id,
-          'Bolo reminder',
+          'Maya reminder',
           text,
           at,
           details,

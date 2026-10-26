@@ -1,7 +1,7 @@
-# Builds Bolo's Android APKs on Codemagic (free plan).
+# Builds Maya's Android APKs on Codemagic (free plan).
 workflows:
   android-apk:
-    name: Bolo – test APK
+    name: Maya – test APK
     max_build_duration: 45
     instance_type: mac_mini_m2
     environment:
@@ -15,7 +15,7 @@ workflows:
     scripts:
       - name: Create the Android project files
         script: |
-          flutter create --org com.boloai --platforms android --project-name bolo .
+          flutter create --org com.mayaai --platforms android --project-name maya .
           rm -f test/widget_test.dart
       - name: Set up desugaring and release keep-rules
         script: |

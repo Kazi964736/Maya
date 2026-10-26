@@ -154,7 +154,7 @@ class Executor {
             arguments: <String, dynamic>{
               'android.intent.extra.alarm.HOUR': h,
               'android.intent.extra.alarm.MINUTES': m,
-              'android.intent.extra.alarm.MESSAGE': 'Bolo',
+              'android.intent.extra.alarm.MESSAGE': 'Maya',
               'android.intent.extra.alarm.SKIP_UI': true,
             },
             flags: [Flag.FLAG_ACTIVITY_NEW_TASK],
@@ -170,7 +170,7 @@ class Executor {
             action: 'android.intent.action.SET_TIMER',
             arguments: <String, dynamic>{
               'android.intent.extra.alarm.LENGTH': secs,
-              'android.intent.extra.alarm.MESSAGE': 'Bolo',
+              'android.intent.extra.alarm.MESSAGE': 'Maya',
               'android.intent.extra.alarm.SKIP_UI': true,
             },
             flags: [Flag.FLAG_ACTIVITY_NEW_TASK],

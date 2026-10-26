@@ -54,8 +54,16 @@ class RuleParser {
   static const _pmWords = ['pm', 'p.m', 'evening', 'night', 'afternoon', 'রাত', 'বিকেল', 'সন্ধ্যা', 'দুপুর', 'शाम', 'रात', 'दोपहर'];
   static const _amWords = ['am', 'a.m', 'morning', 'সকাল', 'ভোর', 'सुबह'];
 
+  /// "Hey Maya", "Maya,", "মায়া", "माया" at the start of a command.
+  static final _wakeWord = RegExp(
+    '^\\s*(?:(?:hey|hi|ok|okay|হে|হাই|अरे|हे)\\s+)?'
+    '(?:maya|মায়া|মায়া|माया)[\\s,।!.]*',
+    caseSensitive: false,
+  );
+
   AssistantAction parse(String input, {DateTime? now}) {
-    final text = normalize(input);
+    final spoken = input.replaceFirst(_wakeWord, '');
+    final text = normalize(spoken);
     final clock = now ?? DateTime.now();
 
     if (text.isEmpty) {
@@ -71,7 +79,7 @@ class RuleParser {
 
     if (_hasAny(text, _remindWords)) {
       final when = _reminderTime(text, clock);
-      final what = _reminderText(input);
+      final what = _reminderText(spoken);
       return AssistantAction(type: ActionType.reminder, when: when, message: what);
     }
 
@@ -233,7 +241,7 @@ class RuleParser {
 
   static String? _callContact(String text) {
     final english =
-        RegExp(r'^(?:(?:please|can you|could you|hey bolo)\s+)*(?:call|phone|dial|ring)\s+(.+?)(?:\s+(?:now|please))?$')
+        RegExp(r'^(?:(?:please|can you|could you|hey maya)\s+)*(?:call|phone|dial|ring)\s+(.+?)(?:\s+(?:now|please))?$')
             .firstMatch(text);
     if (english != null) {
       return english.group(1)!.trim();

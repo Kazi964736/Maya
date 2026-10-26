@@ -233,7 +233,7 @@ class _HomeScreenState extends State<HomeScreen> {
     final lang = settings.language;
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Bolo'),
+        title: const Text('Maya'),
         actions: [
           IconButton(
             tooltip: 'Good morning briefing',
@@ -393,7 +393,7 @@ class _Suggestions extends StatelessWidget {
         const SizedBox(height: 24),
         Icon(Icons.graphic_eq, size: 56, color: theme.colorScheme.primary),
         const SizedBox(height: 12),
-        Text('Bolo', textAlign: TextAlign.center, style: theme.textTheme.headlineMedium),
+        Text('Maya', textAlign: TextAlign.center, style: theme.textTheme.headlineMedium),
         const SizedBox(height: 4),
         Text(
           'Tap the mic and speak in বাংলা, हिंदी or English.',
