@@ -647,7 +647,9 @@ class Executor {
     if (settings.hasAi) {
       try {
         final name = settings.userName.isEmpty ? '' : 'Greet ${settings.userName} by name. ';
-        return await gemini.phrase('${name}Good morning briefing. $weather $remindersText', lang);
+        final h = DateTime.now().hour;
+        final greet = h < 12 ? 'Good morning' : (h < 17 ? 'Good afternoon' : 'Good evening');
+        return await gemini.phrase('${name}$greet briefing (it is ${_two(h)}:00 now). $weather $remindersText', lang);
       } catch (_) {}
     }
     return '$weather $remindersText';

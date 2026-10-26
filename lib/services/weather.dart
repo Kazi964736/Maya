@@ -41,14 +41,18 @@ class WeatherService {
 
   Future<WeatherReport> fetch(String city) async {
     final geoRes = await http
-        .get(Uri.https('geocoding-api.open-meteo.com', '/v1/search', {'name': city, 'count': '1', 'language': 'en'}))
+        .get(Uri.https('geocoding-api.open-meteo.com', '/v1/search', {'name': city, 'count': '10', 'language': 'en'}))
         .timeout(const Duration(seconds: 15));
     final geo = jsonDecode(geoRes.body) as Map<String, dynamic>;
     final results = geo['results'];
     if (results is! List || results.isEmpty) {
       throw Exception('Could not find "$city"');
     }
-    final place = results.first as Map<String, dynamic>;
+    // Several towns share a name: prefer the biggest one in India (Maya's home market).
+    final places = results.whereType<Map<String, dynamic>>().toList();
+    final indian = places.where((p) => p['country_code'] == 'IN').toList()
+      ..sort((a, b) => ((b['population'] as num?) ?? 0).compareTo((a['population'] as num?) ?? 0));
+    final place = indian.isNotEmpty ? indian.first : places.first;
     final res = await http
         .get(Uri.https('api.open-meteo.com', '/v1/forecast', {
           'latitude': '${place['latitude']}',
