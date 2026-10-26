@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
@@ -12,6 +13,8 @@ import '../services/executor.dart';
 import '../services/phone_brand.dart';
 import '../services/voice.dart';
 import '../settings.dart';
+import '../ui/orb.dart';
+import '../ui/theme.dart';
 import 'reminders_screen.dart';
 import 'settings_screen.dart';
 
@@ -275,7 +278,11 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver imp
               onPressed: () => Navigator.pop(ctx, c),
               child: ListTile(
                 contentPadding: EdgeInsets.zero,
-                leading: const Icon(Icons.person),
+                leading: CircleAvatar(
+                  backgroundColor: MayaColors.violet.withValues(alpha: 0.2),
+                  foregroundColor: MayaColors.text,
+                  child: Text(c.name.trim().isEmpty ? '?' : c.name.trim().characters.first.toUpperCase()),
+                ),
                 title: Text(c.name),
                 subtitle: Text(c.number),
               ),
@@ -296,7 +303,12 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver imp
     }
     final go = await showDialog<bool>(
       context: context,
-      builder: (_) => _CallCountdown(contact: contact, cancelLabel: _t('Cancel', 'বাতিল', 'रद्द करें')),
+      barrierDismissible: false,
+      builder: (_) => _CallCountdown(
+        contact: contact,
+        cancelLabel: _t('Cancel', 'বাতিল', 'रद्द करें'),
+        callingLabel: _t('Calling in 3 seconds…', '৩ সেকেন্ডে ফোন যাবে…', '3 सेकंड में कॉल होगी…'),
+      ),
     );
     return go ?? false;
   }
@@ -334,47 +346,62 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver imp
         _ => en,
       };
 
+
+  String get _greeting {
+    final h = DateTime.now().hour;
+    final name = settings.userName.isEmpty ? '' : ', ${settings.userName}';
+    if (h < 12) {
+      return _t('Good morning$name', 'সুপ্রভাত$name', 'सुप्रभात$name');
+    }
+    if (h < 17) {
+      return _t('Good afternoon$name', 'শুভ দুপুর$name', 'नमस्ते$name');
+    }
+    return _t('Good evening$name', 'শুভ সন্ধ্যা$name', 'शुभ संध्या$name');
+  }
+
   Widget _languageBanner(LanguageProblem problem) {
-    final theme = Theme.of(context);
     final name = problem.language.label;
     final isVoice = problem.kind == 'voice';
     final text = isVoice
         ? _t(
-            'No $name voice is installed, so replies are read in English. Install it in Text-to-speech settings.',
-            '$name ভয়েস ইনস্টল নেই, তাই উত্তর ইংরেজিতে পড়ছে। Text-to-speech সেটিংসে ইনস্টল করুন।',
-            '$name आवाज़ इंस्टॉल नहीं है, इसलिए जवाब अंग्रेज़ी में पढ़े जा रहे हैं। Text-to-speech सेटिंग में इंस्टॉल करें।',
+            'No $name voice is installed, so replies are read in English.',
+            '$name ভয়েস ইনস্টল নেই, তাই উত্তর ইংরেজিতে পড়ছে।',
+            '$name आवाज़ इंस्टॉल नहीं है, इसलिए जवाब अंग्रेज़ी में पढ़े जा रहे हैं।',
           )
         : _t(
-            "Your phone's speech service may not understand $name. Update the Google app or add $name in voice input settings.",
-            'আপনার ফোনের স্পিচ সার্ভিস হয়তো $name বোঝে না। Google অ্যাপ আপডেট করুন বা ভয়েস ইনপুট সেটিংসে $name যোগ করুন।',
-            'आपके फोन की स्पीच सर्विस शायद $name नहीं समझती। Google ऐप अपडेट करें या वॉइस इनपुट सेटिंग में $name जोड़ें।',
+            "Your phone may not understand $name speech yet.",
+            'আপনার ফোন হয়তো এখনও $name কথা বোঝে না।',
+            'आपका फोन शायद अभी $name नहीं समझता।',
           );
     void dismiss() {
       settings.prefs.setBool('dismissed_${problem.key}', true);
       voice.languageProblem.value = null;
     }
 
-    return Card(
-      margin: const EdgeInsets.fromLTRB(12, 4, 12, 4),
-      color: theme.colorScheme.tertiaryContainer,
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(12, 8, 4, 4),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(text, style: TextStyle(color: theme.colorScheme.onTertiaryContainer)),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.end,
-              children: [
-                TextButton(onPressed: dismiss, child: Text(_t('Dismiss', 'বন্ধ করুন', 'बंद करें'))),
-                TextButton(
-                  onPressed: () => isVoice ? openVoiceSettings() : openSpeechSettings(),
-                  child: Text(_t('Fix it', 'ঠিক করুন', 'ठीक करें')),
-                ),
-              ],
-            ),
-          ],
-        ),
+    return Container(
+      margin: const EdgeInsets.fromLTRB(16, 4, 16, 4),
+      padding: const EdgeInsets.fromLTRB(14, 10, 6, 10),
+      decoration: BoxDecoration(
+        color: MayaColors.amber.withValues(alpha: 0.10),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: MayaColors.amber.withValues(alpha: 0.35)),
+      ),
+      child: Row(
+        children: [
+          const Icon(Icons.info_outline_rounded, color: MayaColors.amber, size: 22),
+          const SizedBox(width: 10),
+          Expanded(child: Text(text, style: const TextStyle(color: MayaColors.text, fontSize: 13.5, height: 1.3))),
+          TextButton(
+            onPressed: () => isVoice ? openVoiceSettings() : openSpeechSettings(),
+            style: TextButton.styleFrom(foregroundColor: MayaColors.amber, visualDensity: VisualDensity.compact),
+            child: Text(_t('Fix', 'ঠিক করুন', 'ठीक करें')),
+          ),
+          IconButton(
+            onPressed: dismiss,
+            visualDensity: VisualDensity.compact,
+            icon: const Icon(Icons.close_rounded, size: 18, color: MayaColors.textDim),
+          ),
+        ],
       ),
     );
   }
@@ -384,25 +411,136 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver imp
     await _saveHistory();
   }
 
+  void _send() {
+    final t = _input.text;
+    _input.clear();
+    FocusScope.of(context).unfocus();
+    _handle(t);
+  }
+
+  OrbMood get _mood {
+    if (voice.listening.value) {
+      return OrbMood.listening;
+    }
+    if (_busy) {
+      return OrbMood.thinking;
+    }
+    if (voice.speaking.value) {
+      return OrbMood.speaking;
+    }
+    return OrbMood.idle;
+  }
+
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
     final lang = settings.language;
+    final state = Listenable.merge([voice.listening, voice.speaking]);
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Maya'),
-        actions: [
-          IconButton(
-            tooltip: 'Good morning briefing',
-            icon: const Icon(Icons.wb_sunny_outlined),
-            onPressed: _busy ? null : () => _handle('☀️ Briefing', forced: const AssistantAction(type: ActionType.briefing)),
+      backgroundColor: MayaColors.bg,
+      body: Stack(
+        children: [
+          const Positioned.fill(child: _Backdrop()),
+          SafeArea(
+            child: Column(
+              children: [
+                _header(),
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
+                  child: _LanguageSwitch(
+                    selected: lang.code,
+                    onChanged: (code) async {
+                      await settings.update(language: languageByCode(code));
+                      if (mounted) {
+                        setState(() {});
+                      }
+                    },
+                  ),
+                ),
+                ValueListenableBuilder<LanguageProblem?>(
+                  valueListenable: voice.languageProblem,
+                  builder: (_, problem, __) => AnimatedSize(
+                    duration: const Duration(milliseconds: 250),
+                    child: problem == null ||
+                            problem.language.code != lang.code ||
+                            settings.prefs.getBool('dismissed_${problem.key}') == true
+                        ? const SizedBox(width: double.infinity)
+                        : _languageBanner(problem),
+                  ),
+                ),
+                Expanded(
+                  child: ListenableBuilder(
+                    listenable: state,
+                    builder: (_, __) => AnimatedSwitcher(
+                      duration: const Duration(milliseconds: 300),
+                      child: _messages.isEmpty && !_busy
+                          ? _Welcome(
+                              key: const ValueKey('welcome'),
+                              greeting: _greeting,
+                              subtitle: _t(
+                                'Tap the orb and speak in বাংলা, हिंदी or English',
+                                'অর্বে ট্যাপ করে বাংলা, हिंदी বা English-এ বলুন',
+                                'ऑर्ब पर टैप करके বাংলা, हिंदी या English में बोलें',
+                              ),
+                              mood: _mood,
+                              level: voice.soundLevel,
+                              onOrbTap: _listen,
+                              items: _suggestions[lang.code]!,
+                              onTap: _handle,
+                              hasAi: settings.hasAi,
+                            )
+                          : _chat(),
+                    ),
+                  ),
+                ),
+                ListenableBuilder(
+                  listenable: state,
+                  builder: (_, __) => AnimatedSwitcher(
+                    duration: const Duration(milliseconds: 250),
+                    transitionBuilder: (child, anim) => FadeTransition(
+                      opacity: anim,
+                      child: SizeTransition(sizeFactor: anim, axisAlignment: -1, child: child),
+                    ),
+                    child: voice.listening.value ? _listeningPanel(lang) : _composer(),
+                  ),
+                ),
+              ],
+            ),
           ),
-          IconButton(
+        ],
+      ),
+    );
+  }
+
+  Widget _header() {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 8, 8, 4),
+      child: Row(
+        children: [
+          Container(
+            width: 10,
+            height: 10,
+            decoration: const BoxDecoration(shape: BoxShape.circle, gradient: MayaColors.brand),
+          ),
+          const SizedBox(width: 10),
+          const Text(
+            'Maya',
+            style: TextStyle(fontSize: 24, fontWeight: FontWeight.w700, letterSpacing: 0.3, color: MayaColors.text),
+          ),
+          const Spacer(),
+          _RoundIcon(
+            icon: Icons.wb_sunny_outlined,
+            tooltip: 'Good morning briefing',
+            onTap: _busy ? null : () => _handle('☀️ Briefing', forced: const AssistantAction(type: ActionType.briefing)),
+          ),
+          _RoundIcon(
+            icon: Icons.notifications_none_rounded,
             tooltip: 'Reminders',
-            icon: const Icon(Icons.notifications_none),
-            onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const RemindersScreen())),
+            onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const RemindersScreen())),
           ),
           PopupMenuButton<String>(
+            icon: const Icon(Icons.more_vert_rounded, color: MayaColors.text),
+            color: MayaColors.surfaceHigh,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
             onSelected: (v) async {
               if (v == 'settings') {
                 await Navigator.push(context, MaterialPageRoute(builder: (_) => const SettingsScreen()));
@@ -413,129 +551,709 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver imp
                 await _clearChat();
               }
             },
-            itemBuilder: (_) => const [
-              PopupMenuItem(value: 'settings', child: Text('Settings')),
-              PopupMenuItem(value: 'clear', child: Text('Clear chat')),
+            itemBuilder: (_) => [
+              PopupMenuItem(
+                value: 'settings',
+                child: Row(children: [
+                  const Icon(Icons.tune_rounded, size: 20),
+                  const SizedBox(width: 12),
+                  Text(_t('Settings', 'সেটিংস', 'सेटिंग्स')),
+                ]),
+              ),
+              PopupMenuItem(
+                value: 'clear',
+                child: Row(children: [
+                  const Icon(Icons.delete_sweep_outlined, size: 20),
+                  const SizedBox(width: 12),
+                  Text(_t('Clear chat', 'চ্যাট মুছুন', 'चैट साफ़ करें')),
+                ]),
+              ),
             ],
           ),
         ],
       ),
-      body: SafeArea(
-        child: Column(
-          children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(12, 4, 12, 4),
-              child: SegmentedButton<String>(
-                segments: [
-                  for (final l in languages) ButtonSegment(value: l.code, label: Text(l.label)),
-                ],
-                selected: {lang.code},
-                showSelectedIcon: false,
-                onSelectionChanged: (s) async {
-                  await settings.update(language: languageByCode(s.first));
-                  if (mounted) {
-                    setState(() {});
-                  }
-                },
+    );
+  }
+
+  Widget _chat() {
+    return ListView.builder(
+      key: const ValueKey('chat'),
+      reverse: true,
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+      itemCount: _messages.length + (_busy ? 1 : 0),
+      itemBuilder: (_, i) {
+        if (_busy && i == 0) {
+          return const _MayaRow(child: _TypingDots());
+        }
+        final m = _messages[_messages.length - 1 - (i - (_busy ? 1 : 0))];
+        return m.fromUser ? _UserBubble(text: m.text) : _MayaRow(child: _MayaText(text: m.text));
+      },
+    );
+  }
+
+  Widget _listeningPanel(AppLanguage lang) {
+    return Container(
+      key: const ValueKey('listening'),
+      width: double.infinity,
+      margin: const EdgeInsets.fromLTRB(12, 4, 12, 12),
+      padding: const EdgeInsets.fromLTRB(20, 16, 20, 16),
+      decoration: BoxDecoration(
+        color: MayaColors.surface.withValues(alpha: 0.92),
+        borderRadius: BorderRadius.circular(32),
+        border: Border.all(color: MayaColors.border),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          ValueListenableBuilder<String>(
+            valueListenable: voice.heard,
+            builder: (_, heard, __) => AnimatedSwitcher(
+              duration: const Duration(milliseconds: 150),
+              child: Text(
+                heard.isEmpty ? _t('Listening…', 'শুনছি…', 'सुन रही हूँ…') : heard,
+                key: ValueKey(heard.isEmpty),
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: heard.isEmpty ? 18 : 22,
+                  height: 1.3,
+                  fontWeight: FontWeight.w500,
+                  color: heard.isEmpty ? MayaColors.textDim : MayaColors.text,
+                ),
               ),
             ),
-            ValueListenableBuilder<LanguageProblem?>(
-              valueListenable: voice.languageProblem,
-              builder: (_, problem, __) =>
-                  problem == null ||
-                          problem.language.code != lang.code ||
-                          settings.prefs.getBool('dismissed_${problem.key}') == true
-                      ? const SizedBox.shrink()
-                      : _languageBanner(problem),
-            ),
-            Expanded(
-              child: _messages.isEmpty
-                  ? _Suggestions(items: _suggestions[lang.code]!, onTap: _handle, hasAi: settings.hasAi)
-                  : ListView.builder(
-                      reverse: true,
-                      padding: const EdgeInsets.fromLTRB(12, 8, 12, 8),
-                      itemCount: _messages.length + (_busy ? 1 : 0),
-                      itemBuilder: (_, i) {
-                        if (_busy && i == 0) {
-                          return const _Bubble(fromUser: false, text: '…');
-                        }
-                        final m = _messages[_messages.length - 1 - (i - (_busy ? 1 : 0))];
-                        return _Bubble(fromUser: m.fromUser, text: m.text);
-                      },
-                    ),
-            ),
-            ValueListenableBuilder<bool>(
-              valueListenable: voice.listening,
-              builder: (_, listening, __) => !listening
-                  ? const SizedBox.shrink()
-                  : ValueListenableBuilder<String>(
-                      valueListenable: voice.heard,
-                      builder: (_, heard, __) => Container(
-                        width: double.infinity,
-                        margin: const EdgeInsets.symmetric(horizontal: 12),
-                        padding: const EdgeInsets.all(12),
-                        decoration: BoxDecoration(
-                          color: theme.colorScheme.primaryContainer,
-                          borderRadius: BorderRadius.circular(16),
-                        ),
-                        child: Text(
-                          heard.isEmpty ? 'Listening… (${lang.label})' : heard,
-                          style: theme.textTheme.titleMedium?.copyWith(color: theme.colorScheme.onPrimaryContainer),
-                        ),
-                      ),
-                    ),
-            ),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(8, 8, 8, 12),
+          ),
+          const SizedBox(height: 8),
+          GestureDetector(
+            onTap: _listen,
+            child: MayaOrb(size: 150, mood: OrbMood.listening, level: voice.soundLevel),
+          ),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                decoration: BoxDecoration(
+                  color: MayaColors.violet.withValues(alpha: 0.18),
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: Text(lang.label, style: const TextStyle(color: MayaColors.text, fontSize: 13)),
+              ),
+              const SizedBox(width: 12),
+              Text(
+                _t('Tap the orb to stop', 'থামাতে অর্বে ট্যাপ করুন', 'रोकने के लिए ऑर्ब पर टैप करें'),
+                style: const TextStyle(color: MayaColors.textDim, fontSize: 13),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _composer() {
+    final hasText = _input.text.trim().isNotEmpty;
+    final speaking = voice.speaking.value;
+    return Padding(
+      key: const ValueKey('composer'),
+      padding: const EdgeInsets.fromLTRB(12, 4, 12, 12),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.end,
+        children: [
+          Expanded(
+            child: Container(
+              constraints: const BoxConstraints(minHeight: 56),
+              padding: const EdgeInsets.only(left: 4, right: 4),
+              decoration: BoxDecoration(
+                color: MayaColors.surface,
+                borderRadius: BorderRadius.circular(28),
+                border: Border.all(color: MayaColors.border),
+              ),
               child: Row(
+                crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
-                  IconButton(
-                    tooltip: 'Explain a photo',
-                    icon: const Icon(Icons.document_scanner_outlined),
-                    onPressed: _busy ? null : _explainPhoto,
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 4),
+                    child: IconButton(
+                      tooltip: 'Explain a photo',
+                      icon: const Icon(Icons.photo_camera_outlined, color: MayaColors.textDim),
+                      onPressed: _busy ? null : _explainPhoto,
+                    ),
                   ),
                   Expanded(
                     child: TextField(
                       controller: _input,
+                      onChanged: (_) => setState(() {}),
                       textInputAction: TextInputAction.send,
                       minLines: 1,
-                      maxLines: 3,
+                      maxLines: 4,
+                      style: const TextStyle(color: MayaColors.text, fontSize: 16),
                       decoration: InputDecoration(
-                        hintText: 'Type or tap the mic…',
-                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(24)),
-                        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-                        suffixIcon: IconButton(
-                          icon: const Icon(Icons.send),
-                          onPressed: () {
-                            final t = _input.text;
-                            _input.clear();
-                            _handle(t);
-                          },
-                        ),
+                        hintText: _t('Ask Maya…', 'মায়াকে বলুন…', 'माया से पूछें…'),
+                        filled: false,
+                        border: InputBorder.none,
+                        enabledBorder: InputBorder.none,
+                        focusedBorder: InputBorder.none,
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 4, vertical: 17),
                       ),
-                      onSubmitted: (t) {
-                        _input.clear();
-                        _handle(t);
-                      },
+                      onSubmitted: (_) => _send(),
                     ),
                   ),
-                  const SizedBox(width: 8),
-                  ValueListenableBuilder<bool>(
-                    valueListenable: voice.listening,
-                    builder: (_, listening, __) => SizedBox(
-                      width: 64,
-                      height: 64,
-                      child: FloatingActionButton(
-                        heroTag: 'mic',
-                        backgroundColor: listening ? theme.colorScheme.error : theme.colorScheme.primary,
-                        foregroundColor: listening ? theme.colorScheme.onError : theme.colorScheme.onPrimary,
-                        onPressed: _listen,
-                        child: Icon(listening ? Icons.stop : Icons.mic, size: 32),
+                  if (hasText)
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 4),
+                      child: IconButton(
+                        icon: const Icon(Icons.arrow_upward_rounded, color: MayaColors.text),
+                        style: IconButton.styleFrom(backgroundColor: MayaColors.violet),
+                        onPressed: _send,
                       ),
                     ),
-                  ),
                 ],
               ),
+            ),
+          ),
+          const SizedBox(width: 10),
+          _MicButton(
+            busy: _busy,
+            speaking: speaking,
+            onTap: speaking ? voice.stopSpeaking : _listen,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Pieces of the home screen
+// ---------------------------------------------------------------------------
+
+class _Backdrop extends StatelessWidget {
+  const _Backdrop();
+
+  @override
+  Widget build(BuildContext context) {
+    return const DecoratedBox(
+      decoration: BoxDecoration(
+        gradient: RadialGradient(
+          center: Alignment(0, -1.1),
+          radius: 1.3,
+          colors: [MayaColors.bgTop, MayaColors.bg],
+          stops: [0.0, 0.7],
+        ),
+      ),
+    );
+  }
+}
+
+class _RoundIcon extends StatelessWidget {
+  const _RoundIcon({required this.icon, required this.tooltip, required this.onTap});
+  final IconData icon;
+  final String tooltip;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 2),
+      child: IconButton(
+        tooltip: tooltip,
+        onPressed: onTap,
+        icon: Icon(icon, color: MayaColors.text, size: 22),
+        style: IconButton.styleFrom(backgroundColor: Colors.white.withValues(alpha: 0.06)),
+      ),
+    );
+  }
+}
+
+class _LanguageSwitch extends StatelessWidget {
+  const _LanguageSwitch({required this.selected, required this.onChanged});
+  final String selected;
+  final ValueChanged<String> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final found = languages.indexWhere((l) => l.code == selected);
+    final index = found < 0 ? 0 : found;
+    return Container(
+      height: 44,
+      padding: const EdgeInsets.all(4),
+      decoration: BoxDecoration(
+        color: MayaColors.surface,
+        borderRadius: BorderRadius.circular(22),
+        border: Border.all(color: MayaColors.border),
+      ),
+      child: LayoutBuilder(
+        builder: (_, box) {
+          final w = box.maxWidth / languages.length;
+          return Stack(
+            children: [
+              AnimatedPositioned(
+                duration: const Duration(milliseconds: 280),
+                curve: Curves.easeOutCubic,
+                left: w * index,
+                top: 0,
+                bottom: 0,
+                width: w,
+                child: Container(
+                  decoration: BoxDecoration(
+                    gradient: MayaColors.brand,
+                    borderRadius: BorderRadius.circular(18),
+                    boxShadow: [BoxShadow(color: MayaColors.violet.withValues(alpha: 0.45), blurRadius: 14)],
+                  ),
+                ),
+              ),
+              Row(
+                children: [
+                  for (final l in languages)
+                    Expanded(
+                      child: GestureDetector(
+                        behavior: HitTestBehavior.opaque,
+                        onTap: () => onChanged(l.code),
+                        child: Center(
+                          child: Text(
+                            l.label,
+                            style: TextStyle(
+                              fontSize: 15,
+                              fontWeight: l.code == selected ? FontWeight.w600 : FontWeight.w400,
+                              color: l.code == selected ? Colors.white : MayaColors.textDim,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+            ],
+          );
+        },
+      ),
+    );
+  }
+}
+
+class _Welcome extends StatelessWidget {
+  const _Welcome({
+    super.key,
+    required this.greeting,
+    required this.subtitle,
+    required this.mood,
+    required this.level,
+    required this.onOrbTap,
+    required this.items,
+    required this.onTap,
+    required this.hasAi,
+  });
+
+  final String greeting;
+  final String subtitle;
+  final OrbMood mood;
+  final ValueNotifier<double> level;
+  final VoidCallback onOrbTap;
+  final List<String> items;
+  final void Function(String) onTap;
+  final bool hasAi;
+
+  static const _icons = [
+    Icons.call_rounded,
+    Icons.alarm_rounded,
+    Icons.timer_outlined,
+    Icons.cloud_outlined,
+    Icons.wb_sunny_outlined,
+  ];
+  static const _tints = [MayaColors.cyan, MayaColors.pink, MayaColors.amber, MayaColors.violet, MayaColors.amber];
+
+  @override
+  Widget build(BuildContext context) {
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(20, 8, 20, 16),
+      children: [
+        const SizedBox(height: 8),
+        Center(
+          child: GestureDetector(
+            onTap: onOrbTap,
+            child: MayaOrb(size: 200, mood: mood, level: level),
+          ),
+        ),
+        const SizedBox(height: 8),
+        Text(
+          greeting,
+          textAlign: TextAlign.center,
+          style: const TextStyle(fontSize: 26, fontWeight: FontWeight.w700, color: MayaColors.text, height: 1.2),
+        ),
+        const SizedBox(height: 6),
+        Text(
+          subtitle,
+          textAlign: TextAlign.center,
+          style: const TextStyle(fontSize: 14.5, color: MayaColors.textDim, height: 1.4),
+        ),
+        const SizedBox(height: 24),
+        GridView.count(
+          crossAxisCount: 2,
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          mainAxisSpacing: 10,
+          crossAxisSpacing: 10,
+          childAspectRatio: 2.3,
+          children: [
+            for (var i = 0; i < items.length; i++)
+              _SuggestionCard(
+                text: items[i],
+                icon: _icons[i % _icons.length],
+                tint: _tints[i % _tints.length],
+                onTap: () => onTap(items[i]),
+              ),
+          ],
+        ),
+        if (!hasAi) ...[
+          const SizedBox(height: 18),
+          Container(
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              color: MayaColors.violet.withValues(alpha: 0.08),
+              borderRadius: BorderRadius.circular(18),
+              border: Border.all(color: MayaColors.violet.withValues(alpha: 0.25)),
+            ),
+            child: const Row(
+              children: [
+                Icon(Icons.auto_awesome_rounded, color: MayaColors.violet, size: 20),
+                SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    'Add a free Gemini key in Settings to ask Maya anything and read photos.',
+                    style: TextStyle(color: MayaColors.textDim, fontSize: 13, height: 1.35),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ],
+    );
+  }
+}
+
+class _SuggestionCard extends StatelessWidget {
+  const _SuggestionCard({required this.text, required this.icon, required this.tint, required this.onTap});
+  final String text;
+  final IconData icon;
+  final Color tint;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: MayaColors.surface,
+      borderRadius: BorderRadius.circular(18),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(18),
+        onTap: onTap,
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(18),
+            border: Border.all(color: MayaColors.border),
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: 34,
+                height: 34,
+                decoration: BoxDecoration(color: tint.withValues(alpha: 0.15), shape: BoxShape.circle),
+                child: Icon(icon, color: tint, size: 19),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  text,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(color: MayaColors.text, fontSize: 13.5, height: 1.25),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _MicButton extends StatelessWidget {
+  const _MicButton({required this.busy, required this.speaking, required this.onTap});
+  final bool busy;
+  final bool speaking;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: busy ? null : onTap,
+      child: Container(
+        width: 56,
+        height: 56,
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          gradient: MayaColors.brand,
+          boxShadow: [
+            BoxShadow(color: MayaColors.violet.withValues(alpha: 0.55), blurRadius: 20, spreadRadius: 1),
+          ],
+        ),
+        child: busy
+            ? const Padding(
+                padding: EdgeInsets.all(17),
+                child: CircularProgressIndicator(strokeWidth: 2.4, color: Colors.white),
+              )
+            : Icon(speaking ? Icons.stop_rounded : Icons.mic_rounded, color: Colors.white, size: 28),
+      ),
+    );
+  }
+}
+
+class _UserBubble extends StatelessWidget {
+  const _UserBubble({required this.text});
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    return Align(
+      alignment: Alignment.centerRight,
+      child: Container(
+        constraints: BoxConstraints(maxWidth: MediaQuery.of(context).size.width * 0.78),
+        margin: const EdgeInsets.only(top: 10, bottom: 4, left: 48),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 11),
+        decoration: const BoxDecoration(
+          gradient: MayaColors.brand,
+          borderRadius: BorderRadius.only(
+            topLeft: Radius.circular(22),
+            topRight: Radius.circular(22),
+            bottomLeft: Radius.circular(22),
+            bottomRight: Radius.circular(6),
+          ),
+        ),
+        child: SelectableText(text, style: const TextStyle(color: Colors.white, fontSize: 16, height: 1.35)),
+      ),
+    );
+  }
+}
+
+/// Maya's replies: a small orb avatar and text on a soft glass card.
+class _MayaRow extends StatelessWidget {
+  const _MayaRow({required this.child});
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(top: 10, bottom: 4, right: 40),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.end,
+        children: [
+          Container(
+            width: 28,
+            height: 28,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              gradient: const RadialGradient(
+                center: Alignment(-0.3, -0.4),
+                colors: [MayaColors.pink, MayaColors.violet, Color(0xFF2A1A5E)],
+                stops: [0.0, 0.55, 1.0],
+              ),
+              boxShadow: [BoxShadow(color: MayaColors.violet.withValues(alpha: 0.5), blurRadius: 10)],
+            ),
+          ),
+          const SizedBox(width: 8),
+          Flexible(
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 11),
+              decoration: BoxDecoration(
+                color: MayaColors.surface,
+                border: Border.all(color: MayaColors.border),
+                borderRadius: const BorderRadius.only(
+                  topLeft: Radius.circular(22),
+                  topRight: Radius.circular(22),
+                  bottomLeft: Radius.circular(6),
+                  bottomRight: Radius.circular(22),
+                ),
+              ),
+              child: child,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _MayaText extends StatelessWidget {
+  const _MayaText({required this.text});
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    return SelectableText(text, style: const TextStyle(color: MayaColors.text, fontSize: 16, height: 1.4));
+  }
+}
+
+class _TypingDots extends StatefulWidget {
+  const _TypingDots();
+
+  @override
+  State<_TypingDots> createState() => _TypingDotsState();
+}
+
+class _TypingDotsState extends State<_TypingDots> with SingleTickerProviderStateMixin {
+  late final AnimationController _c = AnimationController(vsync: this, duration: const Duration(milliseconds: 1100))
+    ..repeat();
+
+  @override
+  void dispose() {
+    _c.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      height: 22,
+      child: AnimatedBuilder(
+        animation: _c,
+        builder: (_, __) => Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            for (var i = 0; i < 3; i++)
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 3),
+                child: Transform.translate(
+                  offset: Offset(0, -4 * math.sin(((_c.value - i * 0.15) % 1.0) * math.pi).clamp(0.0, 1.0)),
+                  child: Container(
+                    width: 8,
+                    height: 8,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: Color.lerp(MayaColors.violet, MayaColors.pink, i / 2),
+                    ),
+                  ),
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// "Calling Rahul Das" with a ring that runs down for 3 seconds and a Cancel
+/// button, so a misheard name never dials the wrong person.
+class _CallCountdown extends StatefulWidget {
+  const _CallCountdown({required this.contact, required this.cancelLabel, required this.callingLabel});
+  final FoundContact contact;
+  final String cancelLabel;
+  final String callingLabel;
+
+  @override
+  State<_CallCountdown> createState() => _CallCountdownState();
+}
+
+class _CallCountdownState extends State<_CallCountdown> with SingleTickerProviderStateMixin {
+  late final AnimationController _ring = AnimationController(vsync: this, duration: const Duration(seconds: 3))
+    ..forward();
+  bool _closed = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _ring.addStatusListener((s) {
+      if (s == AnimationStatus.completed) {
+        _close(true);
+      }
+    });
+  }
+
+  void _close(bool call) {
+    if (_closed || !mounted) {
+      return;
+    }
+    _closed = true;
+    Navigator.of(context).pop(call);
+  }
+
+  @override
+  void dispose() {
+    _ring.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final name = widget.contact.name.trim();
+    final initial = name.isEmpty ? '?' : name.characters.first.toUpperCase();
+    return Dialog(
+      insetPadding: const EdgeInsets.symmetric(horizontal: 32),
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(24, 28, 24, 20),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(widget.callingLabel, style: const TextStyle(color: MayaColors.textDim, fontSize: 14)),
+            const SizedBox(height: 18),
+            SizedBox(
+              width: 112,
+              height: 112,
+              child: AnimatedBuilder(
+                animation: _ring,
+                builder: (_, __) => Stack(
+                  fit: StackFit.expand,
+                  children: [
+                    CircularProgressIndicator(
+                      value: 1 - _ring.value,
+                      strokeWidth: 4,
+                      color: MayaColors.cyan,
+                      backgroundColor: Colors.white.withValues(alpha: 0.08),
+                    ),
+                    Padding(
+                      padding: const EdgeInsets.all(10),
+                      child: Container(
+                        decoration: const BoxDecoration(shape: BoxShape.circle, gradient: MayaColors.brand),
+                        alignment: Alignment.center,
+                        child: Text(
+                          initial,
+                          style: const TextStyle(fontSize: 38, fontWeight: FontWeight.w700, color: Colors.white),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(height: 16),
+            Text(
+              name,
+              textAlign: TextAlign.center,
+              style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w700, color: MayaColors.text),
+            ),
+            const SizedBox(height: 4),
+            Text(widget.contact.number, style: const TextStyle(color: MayaColors.textDim, fontSize: 15)),
+            const SizedBox(height: 24),
+            Row(
+              children: [
+                Expanded(
+                  child: _PillButton(
+                    color: MayaColors.danger,
+                    icon: Icons.call_end_rounded,
+                    label: widget.cancelLabel,
+                    onTap: () => _close(false),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: _PillButton(
+                    color: const Color(0xFF22C55E),
+                    icon: Icons.call_rounded,
+                    label: 'Call',
+                    onTap: () => _close(true),
+                  ),
+                ),
+              ],
             ),
           ],
         ),
@@ -544,142 +1262,25 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver imp
   }
 }
 
-class _Suggestions extends StatelessWidget {
-  const _Suggestions({required this.items, required this.onTap, required this.hasAi});
-  final List<String> items;
-  final void Function(String) onTap;
-  final bool hasAi;
+class _PillButton extends StatelessWidget {
+  const _PillButton({required this.color, required this.icon, required this.label, required this.onTap});
+  final Color color;
+  final IconData icon;
+  final String label;
+  final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return ListView(
-      padding: const EdgeInsets.all(24),
-      children: [
-        const SizedBox(height: 24),
-        Icon(Icons.graphic_eq, size: 56, color: theme.colorScheme.primary),
-        const SizedBox(height: 12),
-        Text('Maya', textAlign: TextAlign.center, style: theme.textTheme.headlineMedium),
-        const SizedBox(height: 4),
-        Text(
-          'Tap the mic and speak in বাংলা, हिंदी or English.',
-          textAlign: TextAlign.center,
-          style: theme.textTheme.bodyMedium,
-        ),
-        const SizedBox(height: 20),
-        Wrap(
-          alignment: WrapAlignment.center,
-          spacing: 8,
-          runSpacing: 8,
-          children: [for (final s in items) ActionChip(label: Text(s), onPressed: () => onTap(s))],
-        ),
-        if (!hasAi) ...[
-          const SizedBox(height: 24),
-          Text(
-            'Calls, alarms, timers, reminders, apps and weather work now. '
-            'For answers to any question and photo reading, add a free Gemini key in Settings.',
-            textAlign: TextAlign.center,
-            style: theme.textTheme.bodySmall,
-          ),
-        ],
-      ],
-    );
-  }
-}
-
-class _Bubble extends StatelessWidget {
-  const _Bubble({required this.fromUser, required this.text});
-  final bool fromUser;
-  final String text;
-
-  @override
-  Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-    return Align(
-      alignment: fromUser ? Alignment.centerRight : Alignment.centerLeft,
-      child: Container(
-        constraints: BoxConstraints(maxWidth: MediaQuery.of(context).size.width * 0.8),
-        margin: const EdgeInsets.symmetric(vertical: 4),
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-        decoration: BoxDecoration(
-          color: fromUser ? scheme.primary : scheme.surfaceContainerHighest,
-          borderRadius: BorderRadius.only(
-            topLeft: const Radius.circular(18),
-            topRight: const Radius.circular(18),
-            bottomLeft: Radius.circular(fromUser ? 18 : 4),
-            bottomRight: Radius.circular(fromUser ? 4 : 18),
-          ),
-        ),
-        child: SelectableText(
-          text,
-          style: TextStyle(color: fromUser ? scheme.onPrimary : scheme.onSurface, fontSize: 16),
-        ),
+    return FilledButton.icon(
+      onPressed: onTap,
+      style: FilledButton.styleFrom(
+        backgroundColor: color,
+        foregroundColor: Colors.white,
+        minimumSize: const Size.fromHeight(52),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(26)),
       ),
-    );
-  }
-}
-
-/// "Calling Rahul Das in 3…" with a Cancel button, so a misheard name never
-/// dials the wrong person.
-class _CallCountdown extends StatefulWidget {
-  const _CallCountdown({required this.contact, required this.cancelLabel});
-  final FoundContact contact;
-  final String cancelLabel;
-
-  @override
-  State<_CallCountdown> createState() => _CallCountdownState();
-}
-
-class _CallCountdownState extends State<_CallCountdown> {
-  int _left = 3;
-  Timer? _timer;
-
-  @override
-  void initState() {
-    super.initState();
-    _timer = Timer.periodic(const Duration(seconds: 1), (t) {
-      if (!mounted) {
-        t.cancel();
-        return;
-      }
-      if (_left <= 1) {
-        t.cancel();
-        Navigator.of(context).pop(true);
-      } else {
-        setState(() => _left--);
-      }
-    });
-  }
-
-  @override
-  void dispose() {
-    _timer?.cancel();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return AlertDialog(
-      icon: const Icon(Icons.call, size: 36),
-      title: Text(widget.contact.name, textAlign: TextAlign.center),
-      content: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Text(widget.contact.number, style: theme.textTheme.bodyLarge),
-          const SizedBox(height: 12),
-          Text('$_left', style: theme.textTheme.displaySmall),
-        ],
-      ),
-      actionsAlignment: MainAxisAlignment.spaceBetween,
-      actions: [
-        TextButton(onPressed: () => Navigator.of(context).pop(false), child: Text(widget.cancelLabel)),
-        FilledButton.icon(
-          onPressed: () => Navigator.of(context).pop(true),
-          icon: const Icon(Icons.call),
-          label: const Text('Call'),
-        ),
-      ],
+      icon: Icon(icon),
+      label: Text(label, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
     );
   }
 }

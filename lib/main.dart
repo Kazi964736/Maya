@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import 'screens/home_screen.dart';
+import 'ui/theme.dart';
 import 'services/reminders.dart';
 import 'services/voice.dart';
 import 'settings.dart';
@@ -24,18 +25,11 @@ class MayaApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    const seed = Color(0xFF5B3CC4);
     return MaterialApp(
       title: 'Maya',
       debugShowCheckedModeBanner: false,
-      theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(seedColor: seed),
-        useMaterial3: true,
-      ),
-      darkTheme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(seedColor: seed, brightness: Brightness.dark),
-        useMaterial3: true,
-      ),
+      theme: mayaTheme(),
+      themeMode: ThemeMode.dark,
       home: const HomeScreen(),
     );
   }

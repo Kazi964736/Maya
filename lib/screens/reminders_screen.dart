@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../services/reminders.dart';
+import '../ui/theme.dart';
 
 class RemindersScreen extends StatelessWidget {
   const RemindersScreen({super.key});
@@ -39,19 +40,31 @@ class RemindersScreen extends StatelessWidget {
               ),
             );
           }
-          return ListView.separated(
+          return ListView.builder(
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
             itemCount: items.length,
-            separatorBuilder: (_, __) => const Divider(height: 1),
             itemBuilder: (_, i) {
               final r = items[i];
-              return ListTile(
-                leading: const Icon(Icons.alarm),
-                title: Text(r.text),
-                subtitle: Text(_when(r.when)),
-                trailing: IconButton(
-                  tooltip: 'Delete',
-                  icon: const Icon(Icons.delete_outline),
-                  onPressed: () => reminders.remove(r),
+              return Card(
+                margin: const EdgeInsets.only(bottom: 10),
+                child: ListTile(
+                  contentPadding: const EdgeInsets.fromLTRB(16, 6, 8, 6),
+                  leading: Container(
+                    width: 40,
+                    height: 40,
+                    decoration: BoxDecoration(
+                      color: MayaColors.violet.withValues(alpha: 0.18),
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(Icons.alarm_rounded, color: MayaColors.violet, size: 21),
+                  ),
+                  title: Text(r.text, style: const TextStyle(color: MayaColors.text, fontWeight: FontWeight.w500)),
+                  subtitle: Text(_when(r.when), style: const TextStyle(color: MayaColors.textDim)),
+                  trailing: IconButton(
+                    tooltip: 'Delete',
+                    icon: const Icon(Icons.delete_outline_rounded),
+                    onPressed: () => reminders.remove(r),
+                  ),
                 ),
               );
             },
